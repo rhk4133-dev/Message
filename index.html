@@ -1,0 +1,362 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RHK Secure Chat</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #090914;
+  color: white;
+  font-family: Arial, sans-serif;
+}
+
+header {
+  padding: 18px;
+  background: #17152b;
+  border-bottom: 1px solid #33304c;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+header h2 {
+  margin: 0;
+  color: #b69aff;
+}
+
+.status {
+  color: #72e6a2;
+  font-size: 12px;
+}
+
+.container {
+  max-width: 650px;
+  margin: 20px auto;
+  padding: 12px;
+}
+
+.profile {
+  padding: 12px;
+  background: #17152b;
+  border-radius: 12px;
+  margin-bottom: 15px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.chat {
+  height: 62vh;
+  min-height: 300px;
+  overflow-y: auto;
+  padding: 15px;
+  background: #111120;
+  border: 1px solid #292743;
+  border-radius: 15px;
+}
+
+.message {
+  max-width: 85%;
+  padding: 12px;
+  margin: 10px 0;
+  border-radius: 12px;
+  overflow-wrap: anywhere;
+}
+
+.mine {
+  background: #603dc0;
+  margin-left: auto;
+}
+
+.theirs {
+  background: #26263b;
+  margin-right: auto;
+}
+
+.sender {
+  font-size: 11px;
+  color: #d1c1ff;
+  margin-bottom: 6px;
+}
+
+.message p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.time {
+  display: block;
+  font-size: 10px;
+  color: #c9c2db;
+  text-align: right;
+  margin-top: 7px;
+}
+
+.input-area {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+input {
+  flex: 1;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #393550;
+  border-radius: 10px;
+  background: #17152b;
+  color: white;
+  outline: none;
+}
+
+button {
+  border: none;
+  border-radius: 10px;
+  padding: 13px 18px;
+  background: #8859ed;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: .5;
+}
+
+.info {
+  color: #aaa5c2;
+  font-size: 12px;
+  margin-top: 12px;
+  text-align: center;
+}
+
+#notice {
+  text-align: center;
+  color: #ffc77c;
+  font-size: 13px;
+  margin: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h2>RHK Secure Chat</h2>
+  <span class="status" id="status">Connecting...</span>
+</header>
+
+<div class="container">
+
+  <div class="profile">
+    <div>YOUR TEST ACCOUNT</div>
+    <div id="userId">Authenticating...</div>
+  </div>
+
+  <div id="notice">Connecting to Firebase...</div>
+
+  <div class="chat" id="chat"></div>
+
+  <div class="input-area">
+    <input
+      id="messageInput"
+      type="text"
+      placeholder="Type a message..."
+      maxlength="1000"
+      disabled
+    >
+    <button id="sendButton" disabled>Send</button>
+  </div>
+
+  <div class="info">
+    Shared test room · Realtime Firebase messaging
+  </div>
+
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+
+<script>
+
+// YOUR FIREBASE CONFIG
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBND3n2ag9qGZG5SJPOKNVYr2dHNLwoD7Y",
+  authDomain: "rhk-music-24bbc.firebaseapp.com",
+  databaseURL: "https://rhk-music-24bbc-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "rhk-music-24bbc",
+  storageBucket: "rhk-music-24bbc.firebasestorage.app",
+  messagingSenderId: "571438674805",
+  appId: "1:571438674805:web:bcfe7856316b638d08193c",
+  measurementId: "G-RF4GEDGP9N"
+};
+
+// INITIALIZE FIREBASE
+
+firebase.initializeApp(firebaseConfig);
+
+const auth = firebase.auth();
+const db = firebase.database();
+
+// SHARED CHAT ROOM
+
+const messagesRef = db.ref("rooms/main/messages");
+
+let currentUser = null;
+let ready = false;
+
+// AUTHENTICATION
+
+auth.onAuthStateChanged(async (user) => {
+
+  try {
+
+    if (!user) {
+      await auth.signInAnonymously();
+      return;
+    }
+
+    currentUser = user;
+
+    document.getElementById("userId").textContent =
+      "UID: " + user.uid;
+
+    document.getElementById("status").textContent =
+      "Connected";
+
+    document.getElementById("notice").textContent =
+      "You are connected to the chat.";
+
+    ready = true;
+
+    document.getElementById("messageInput").disabled = false;
+    document.getElementById("sendButton").disabled = false;
+
+    loadMessages();
+
+  } catch (error) {
+
+    document.getElementById("notice").textContent =
+      error.message;
+
+  }
+
+});
+
+// LOAD MESSAGES
+
+function loadMessages() {
+
+  const chat = document.getElementById("chat");
+
+  messagesRef.limitToLast(100).on("child_added", (snapshot) => {
+
+    const data = snapshot.val();
+
+    if (!data || !data.text || !data.senderUid) return;
+
+    const message = document.createElement("div");
+
+    message.className =
+      "message " +
+      (data.senderUid === currentUser.uid ? "mine" : "theirs");
+
+    const sender = document.createElement("div");
+    sender.className = "sender";
+
+    sender.textContent =
+      data.senderUid === currentUser.uid
+        ? "You"
+        : "Other user · " + data.senderUid.substring(0, 8);
+
+    const content = document.createElement("p");
+    content.textContent = data.text;
+
+    const time = document.createElement("span");
+    time.className = "time";
+
+    time.textContent = data.createdAt
+      ? new Date(data.createdAt).toLocaleTimeString()
+      : "Sending...";
+
+    message.appendChild(sender);
+    message.appendChild(content);
+    message.appendChild(time);
+
+    chat.appendChild(message);
+
+    chat.scrollTop = chat.scrollHeight;
+
+  }, (error) => {
+
+    document.getElementById("notice").textContent =
+      "Message loading error: " + error.message;
+
+  });
+
+}
+
+// SEND MESSAGE
+
+async function sendMessage() {
+
+  if (!ready || !currentUser) return;
+
+  const input = document.getElementById("messageInput");
+  const text = input.value.trim();
+
+  if (!text) return;
+
+  const button = document.getElementById("sendButton");
+
+  button.disabled = true;
+
+  try {
+
+    await messagesRef.push({
+      text: text,
+      senderUid: currentUser.uid,
+      createdAt: firebase.database.ServerValue.TIMESTAMP
+    });
+
+    input.value = "";
+
+  } catch (error) {
+
+    document.getElementById("notice").textContent =
+      "Send failed: " + error.message;
+
+  } finally {
+
+    button.disabled = false;
+
+  }
+
+}
+
+document.getElementById("sendButton")
+  .addEventListener("click", sendMessage);
+
+document.getElementById("messageInput")
+  .addEventListener("keydown", (event) => {
+
+    if (event.key === "Enter") {
+      sendMessage();
+    }
+
+  });
+
+</script>
+
+</body>
+</html>
