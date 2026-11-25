@@ -73,10 +73,10 @@
 
   <header><span>RHK</span> Route Guider</header>
 
-  <iframe id="content" src="home.html" title="content"></iframe>
+  <iframe id="content" src="home.html" allow="geolocation" title="content"></iframe>
 
   <nav>
-    <button class="active" onclick="go('home.html', this)">
+    <button id="homeBtn" class="active" onclick="go('home.html', this)">
       <svg viewBox="0 0 24 24">
         <path d="M3 11.5 12 4l9 7.5"/>
         <path d="M5.5 10v9.5h13V10"/>
@@ -84,7 +84,7 @@
       </svg>
       Home
     </button>
-    <button onclick="go('map.html', this)">
+    <button id="mapBtn" onclick="go('map.html', this)">
       <svg viewBox="0 0 24 24">
         <path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z"/>
         <circle cx="12" cy="10" r="2.3"/>
@@ -94,10 +94,27 @@
   </nav>
 
   <script>
+    function setActive(btn) {
+      document.querySelectorAll('nav button').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+    }
+
     function go(page, btn) {
       document.getElementById('content').src = page;
-      document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+      setActive(btn);
+    }
+
+    // Called from home.html when a stop card is tapped:
+    // opens the Maps page with the route to that stop
+    function openMap(lat, lon, name, from) {
+      var url = 'map.html?dlat=' + encodeURIComponent(lat) +
+                '&dlon=' + encodeURIComponent(lon) +
+                '&name=' + encodeURIComponent(name || 'Destination');
+      if (from && from.lat != null && from.lon != null) {
+        url += '&slat=' + encodeURIComponent(from.lat) + '&slon=' + encodeURIComponent(from.lon);
+      }
+      document.getElementById('content').src = url;
+      setActive(document.getElementById('mapBtn'));
     }
   </script>
 </body>
