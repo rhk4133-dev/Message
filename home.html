@@ -17,20 +17,9 @@
       color: var(--text);
       padding: 22px 18px;
     }
+    h1 { font-size: 26px; font-weight: 700; margin-bottom: 14px; }
 
-    /* Primary text */
-    h1 {
-      font-size: 26px;
-      font-weight: 700;
-      margin-bottom: 14px;
-    }
-
-    /* Secondary buttons */
-    .quick {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 18px;
-    }
+    .quick { display: flex; gap: 8px; margin-bottom: 18px; }
     .quick button {
       flex: 1;
       display: flex;
@@ -47,13 +36,9 @@
       cursor: pointer;
     }
     .quick button svg {
-      width: 17px;
-      height: 17px;
-      stroke: currentColor;
-      fill: none;
-      stroke-width: 1.8;
-      stroke-linecap: round;
-      stroke-linejoin: round;
+      width: 17px; height: 17px;
+      stroke: currentColor; fill: none;
+      stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
     }
     .quick button.active {
       border-color: var(--accent);
@@ -61,64 +46,152 @@
       color: #fff;
     }
 
-    /* Stop cards */
+    /* ---------- Plain card (used by the loader) ---------- */
     .card {
       border: 1px solid var(--line);
-      border-radius: 12px;
+      border-radius: 14px;
       padding: 14px;
       margin-bottom: 12px;
       background: #fff;
     }
-    .top {
+    .top { display: flex; align-items: center; gap: 12px; }
+
+    /* ---------- Photo card ---------- */
+    .card.photo {
+      padding: 0;
+      overflow: hidden;
+      box-shadow: 0 1px 6px rgba(20, 30, 50, 0.1);
+    }
+
+    /* photo area: full photo is always visible */
+    .pic {
+      position: relative;
+      height: 200px;
+      overflow: hidden;
+      background: #e9edf3;
+    }
+    .pic .blur {
+      position: absolute;
+      top: -12px; left: -12px; right: -12px; bottom: -12px;
+      background-size: cover;
+      background-position: center;
+      filter: blur(14px);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .pic img {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .pic.ready .blur, .pic.ready img { opacity: 1; }
+
+    /* number + distance on the photo */
+    .topbar {
+      position: absolute;
+      top: 10px; left: 10px; right: 10px;
       display: flex;
       align-items: center;
-      gap: 12px;
+      justify-content: space-between;
+      z-index: 2;
     }
     .num {
-      width: 28px;
-      height: 28px;
+      width: 30px; height: 30px;
       border-radius: 50%;
-      background: #eaf1fd;
+      background: #fff;
       color: var(--accent);
-      font-size: 13px;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
+      font-size: 14px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
     }
-    .title { flex: 1; font-size: 16px; font-weight: 600; }
-    .dist { text-align: right; font-size: 17px; font-weight: 700; color: var(--accent); white-space: nowrap; }
+    .dist {
+      padding: 5px 12px;
+      border-radius: 16px;
+      background: #fff;
+      color: var(--accent);
+      font-size: 15px; font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    }
+
+    /* text area below the photo */
+    .panel { background: #fff; padding: 12px 14px 14px; }
+    .title { font-size: 16px; font-weight: 700; color: var(--text); line-height: 1.25; }
 
     .dir {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-top: 10px;
-      font-size: 13px;
-      color: var(--muted);
+      display: flex; align-items: center; gap: 6px;
+      margin-top: 6px;
+      font-size: 13px; color: #556072;
     }
     .dir svg {
-      width: 15px;
-      height: 15px;
-      stroke: var(--muted);
-      fill: none;
-      stroke-width: 2;
-      stroke-linecap: round;
-      stroke-linejoin: round;
+      width: 15px; height: 15px;
+      stroke: var(--accent); fill: none;
+      stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
     }
 
-    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
     .chip {
       font-size: 12px;
       padding: 4px 9px;
       border-radius: 12px;
-      background: #f2f4f7;
-      color: #3b4656;
+      background: #e9effa;
+      color: #26426f;
+      font-weight: 500;
     }
-    .nodata { margin-top: 10px; font-size: 12px; color: var(--muted); }
+    .nodata { margin-top: 8px; font-size: 12px; color: #6b7686; }
 
     .msg { font-size: 14px; color: var(--muted); padding: 8px 0; }
+    .retry {
+      margin-top: 8px;
+      padding: 9px 18px;
+      border: 0;
+      border-radius: 20px;
+      background: var(--accent);
+      color: #fff;
+      font: inherit;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    /* ---------- Loader ---------- */
+    .loading-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .spinner {
+      width: 22px;
+      height: 22px;
+      border: 3px solid #dbe6fb;
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .skeleton .bar {
+      border-radius: 6px;
+      background: linear-gradient(90deg, #eef1f5 25%, #f8f9fb 50%, #eef1f5 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.3s linear infinite;
+    }
+    .skeleton .circle { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; }
+    .skeleton .b1 { flex: 1; height: 16px; }
+    .skeleton .b2 { width: 52px; height: 16px; }
+    .skeleton .b3 { width: 45%; height: 12px; margin-top: 12px; }
+    .skeleton .b4 { width: 70%; height: 12px; margin-top: 8px; }
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
   </style>
 </head>
 <body>
@@ -155,29 +228,81 @@
   <div id="results"></div>
 
   <script>
+    /* ---------- Your own photos (always included) ---------- */
+    const MY_PHOTOS = {
+      bus: [
+        'https://i.ibb.co/ZRTKXGtB/IMG-49655d47-832e-45ad-8202-42078e0438f0.webp',
+        'https://i.ibb.co/sdbR9hQz/IMG-e02c9627-c35e-4cef-97b4-283bdf37bf7f.jpg',
+        'https://i.ibb.co/nNycszPM/IMG-c1f39b2c-c06b-434a-8266-fca5df3fef4e.jpg'
+      ],
+      metro: [
+        'https://i.ibb.co/67HBb149/IMG-9de4e575-209a-4a76-bb0f-70c5c70726ab.jpg',
+        'https://i.ibb.co/dsbkz7Sx/IMG-d65811f9-5abd-490a-87e8-765a93f4d9a4.jpg',
+        'https://i.ibb.co/DfWfGqbn/IMG-a7817b68-c34a-4db7-846a-c066f14b45d9.jpg'
+      ],
+      rail: [
+        'https://i.ibb.co/xt5vpCfV/IMG-281f1f59-ef2c-4e2f-a8ca-d2f74d5c8874.jpg',
+        'https://i.ibb.co/jvvhkpNc/IMG-a7ea785b-9e9c-40e5-a5fc-d4a5f9e1f181.jpg',
+        'https://i.ibb.co/ZpKjpkpt/IMG-1fa53e4f-b345-472a-b5c4-5ef6a13f5835.jpg'
+      ]
+    };
+
+    /* ---------- Extra photos loaded from Wikimedia Commons ----------
+       Change these words if you want different kinds of photos. */
+    const SEARCH = {
+      bus:   'BMTC bus Bengaluru',
+      metro: 'Namma Metro Bengaluru train',
+      rail:  'Indian Railways passenger train station'
+    };
+
     const labels = { bus: 'bus stops', metro: 'metro stations', rail: 'railway stations' };
+    const servers = [
+      'https://overpass-api.de/api/interpreter',
+      'https://overpass.kumi.systems/api/interpreter',
+      'https://overpass.private.coffee/api/interpreter',
+      'https://overpass.openstreetmap.fr/api/interpreter'
+    ];
     const results = document.getElementById('results');
     const cache = {};
     let myPos = null;
+    let currentType = 'bus';
 
     document.querySelectorAll('.quick button').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        document.querySelectorAll('.quick button').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.quick button').forEach(function (b) { b.classList.remove('active'); });
         btn.classList.add('active');
-        start(btn.dataset.type);
+        currentType = btn.dataset.type;
+        start(currentType);
       });
     });
 
     // Load nearby bus stops automatically when the page opens
     start('bus');
 
-    function show(text) {
-      results.innerHTML = '<p class="msg">' + text + '</p>';
+    function show(text, retry) {
+      results.innerHTML = '<p class="msg">' + escapeHtml(text) + '</p>' +
+        (retry ? '<button class="retry" id="retryBtn">Try again</button>' : '');
+      if (retry) {
+        document.getElementById('retryBtn').onclick = function () { start(currentType); };
+      }
+    }
+
+    // Spinner + placeholder cards while loading
+    function loading(text) {
+      const card =
+        '<div class="card skeleton">' +
+          '<div class="top"><div class="bar circle"></div><div class="bar b1"></div><div class="bar b2"></div></div>' +
+          '<div class="bar b3"></div>' +
+          '<div class="bar b4"></div>' +
+        '</div>';
+      results.innerHTML =
+        '<div class="loading-row"><div class="spinner"></div><span>' + escapeHtml(text) + '</span></div>' +
+        card + card + card;
     }
 
     function start(type) {
       if (cache[type]) { render(cache[type], type); return; }
-      show('Finding your location...');
+      loading('Finding your location...');
       if (myPos) { search(type); return; }
 
       if (!navigator.geolocation) { show('Location is not supported on this device.'); return; }
@@ -186,11 +311,11 @@
         myPos = { lat: pos.coords.latitude, lon: pos.coords.longitude };
         search(type);
       }, function () {
-        show('Could not get your location. Please turn on location and allow permission.');
-      }, { enableHighAccuracy: true, timeout: 15000 });
+        show('Could not get your location. Please turn on location and allow permission.', true);
+      }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 });
     }
 
-    /* ---------- Overpass query ---------- */
+    /* ---------- Overpass ---------- */
     function buildQuery(type, r) {
       const a = '(around:' + r + ',' + myPos.lat + ',' + myPos.lon + ')';
       let body = '';
@@ -203,27 +328,64 @@
         body = 'node["railway"="station"]["station"!="subway"]["subway"!="yes"]' + a + ';' +
                'node["railway"="halt"]' + a + ';';
       }
-      return '[out:json][timeout:20];(' + body + ');out 200;';
+      return '[out:json][timeout:15];(' + body + ');out 100;';
+    }
+
+    // Ask one server, give up after 10 seconds
+    function askServer(url, query) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(function () { ctrl.abort(); }, 10000);
+      return fetch(url, {
+        method: 'POST',
+        body: 'data=' + encodeURIComponent(query),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        signal: ctrl.signal
+      }).then(function (res) {
+        clearTimeout(timer);
+        if (!res.ok) { throw new Error('server ' + res.status); }
+        return res.json();
+      }).catch(function (e) {
+        clearTimeout(timer);
+        throw e;
+      });
+    }
+
+    // Ask all servers at once, use the first good answer
+    function overpass(query) {
+      return new Promise(function (resolve, reject) {
+        let failed = 0, lastErr = '';
+        servers.forEach(function (s) {
+          askServer(s, query)
+            .then(function (data) {
+              if (data && data.elements) { resolve(data); }
+              else { throw new Error('empty reply'); }
+            })
+            .catch(function (e) {
+              lastErr = e.message || String(e);
+              failed++;
+              if (failed === servers.length) { reject(new Error(lastErr)); }
+            });
+        });
+      });
     }
 
     async function search(type) {
-      const radii = [1500, 5000, 15000, 40000];
-      show('Searching nearby ' + labels[type] + '...');
+      const radii = type === 'bus' ? [1000, 3000, 8000] : [5000, 15000, 40000];
+      if (currentType === type) { loading('Searching nearby ' + labels[type] + '...'); }
 
       try {
+        let list = [];
         for (const r of radii) {
-          const res = await fetch('https://overpass-api.de/api/interpreter?data=' +
-                                  encodeURIComponent(buildQuery(type, r)));
-          const data = await res.json();
-          const list = pickThree(data.elements, type);
-          if (list.length >= 3 || r === radii[radii.length - 1]) {
-            cache[type] = list;
-            render(list, type);
-            return;
-          }
+          const data = await overpass(buildQuery(type, r));
+          list = pickThree(data.elements, type);
+          if (list.length >= 3) { break; }
         }
+        cache[type] = list;
+        if (currentType === type) { render(list, type); }
       } catch (e) {
-        show('Could not load data. Check your internet and try again.');
+        if (currentType === type) {
+          show('Could not load data (' + e.message + '). Try again.', true);
+        }
       }
     }
 
@@ -236,19 +398,19 @@
           dir: direction(myPos.lat, myPos.lon, el.lat, el.lon),
           info: details(t)
         };
-      }).sort((x, y) => x.dist - y.dist);
+      }).sort(function (x, y) { return x.dist - y.dist; });
 
       // skip duplicates (same name very close, e.g. opposite sides of the road)
       const out = [];
       withDist.forEach(function (p) {
         if (out.length >= 3) { return; }
-        const dup = out.some(o => o.name === p.name && Math.abs(o.dist - p.dist) < 150);
+        const dup = out.some(function (o) { return o.name === p.name && Math.abs(o.dist - p.dist) < 150; });
         if (!dup) { out.push(p); }
       });
       return out;
     }
 
-    // Build the small info tags from whatever data the stop has
+    // Small info tags from whatever data the stop has
     function details(t) {
       const info = [];
       if (t.ref) { info.push('Stop no. ' + t.ref); }
@@ -265,32 +427,118 @@
     }
 
     function render(list, type) {
-      if (!list.length) { show('No ' + labels[type] + ' found near you.'); return; }
-      const arrow = '<svg viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></svg>';
+      if (!list.length) { show('No ' + labels[type] + ' found near you.', true); return; }
+      const pin = '<svg viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></svg>';
 
       results.innerHTML = list.map(function (p, i) {
         const chips = p.info.length
-          ? '<div class="chips">' + p.info.map(x => '<span class="chip">' + escapeHtml(x) + '</span>').join('') + '</div>'
+          ? '<div class="chips">' + p.info.map(function (x) { return '<span class="chip">' + escapeHtml(x) + '</span>'; }).join('') + '</div>'
           : '<div class="nodata">No extra details available</div>';
 
-        return '<div class="card">' +
-          '<div class="top">' +
-            '<div class="num">' + (i + 1) + '</div>' +
-            '<div class="title">' + escapeHtml(p.name) + '</div>' +
-            '<div class="dist">' + fmt(p.dist) + '</div>' +
+        return '<div class="card photo" data-i="' + i + '">' +
+          '<div class="pic">' +
+            '<div class="blur"></div>' +
+            '<img alt="">' +
+            '<div class="topbar">' +
+              '<div class="num">' + (i + 1) + '</div>' +
+              '<div class="dist">' + fmt(p.dist) + '</div>' +
+            '</div>' +
           '</div>' +
-          '<div class="dir">' + arrow + p.dir + ' of you</div>' +
-          chips +
+          '<div class="panel">' +
+            '<div class="title">' + escapeHtml(p.name) + '</div>' +
+            '<div class="dir">' + pin + p.dir + ' of you</div>' +
+            chips +
+          '</div>' +
         '</div>';
       }).join('');
+
+      applyPhotos(type);
+    }
+
+    /* ---------- Photos ---------- */
+    function shuffle(arr) {
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const t = a[i]; a[i] = a[j]; a[j] = t;
+      }
+      return a;
+    }
+
+    // Can this photo load? (gives up after 6 seconds)
+    function canLoad(url) {
+      return new Promise(function (resolve) {
+        const img = new Image();
+        const timer = setTimeout(function () { resolve(false); }, 6000);
+        img.onload = function () { clearTimeout(timer); resolve(true); };
+        img.onerror = function () { clearTimeout(timer); resolve(false); };
+        img.src = url;
+      });
+    }
+
+    // Get extra photos from Wikimedia Commons (free photo library)
+    function commonsPhotos(type) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(function () { ctrl.abort(); }, 5000);
+      const url = 'https://commons.wikimedia.org/w/api.php' +
+        '?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=20' +
+        '&gsrsearch=' + encodeURIComponent(SEARCH[type] + ' filetype:bitmap') +
+        '&prop=imageinfo&iiprop=url|mime&iiurlwidth=900';
+
+      return fetch(url, { signal: ctrl.signal })
+        .then(function (r) { clearTimeout(timer); return r.json(); })
+        .then(function (data) {
+          const pages = (data.query && data.query.pages) ? Object.values(data.query.pages) : [];
+          return pages.map(function (p) {
+            const info = p.imageinfo && p.imageinfo[0];
+            return (info && info.mime === 'image/jpeg') ? (info.thumburl || info.url) : null;
+          }).filter(Boolean);
+        })
+        .catch(function () { clearTimeout(timer); return []; });
+    }
+
+    // The 3 photos for a type are picked once per visit and then kept.
+    // They are picked again only after the app/tab is closed and opened again.
+    async function getPhotos(type) {
+      const key = 'rhk_photos_' + type;
+      try {
+        const saved = JSON.parse(sessionStorage.getItem(key) || 'null');
+        if (saved && saved.length) { return saved; }
+      } catch (e) {}
+
+      const extra = await commonsPhotos(type);
+      const pool = shuffle(MY_PHOTOS[type].concat(extra));
+      const tryList = pool.slice(0, 9);
+      const ok = await Promise.all(tryList.map(canLoad));
+      let chosen = tryList.filter(function (u, i) { return ok[i]; }).slice(0, 3);
+
+      if (!chosen.length) { chosen = shuffle(MY_PHOTOS[type]).slice(0, 3); }
+
+      try { sessionStorage.setItem(key, JSON.stringify(chosen)); } catch (e) {}
+      return chosen;
+    }
+
+    function applyPhotos(type) {
+      const cards = results.querySelectorAll('.card.photo');
+      getPhotos(type).then(function (urls) {
+        if (currentType !== type) { return; }
+        cards.forEach(function (card, i) {
+          const pic = card.querySelector('.pic');
+          if (!urls.length) { pic.style.display = 'none'; return; }
+          const url = urls[i % urls.length];
+          card.querySelector('img').src = url;
+          card.querySelector('.blur').style.backgroundImage = 'url("' + url.replace(/"/g, '%22') + '")';
+          pic.classList.add('ready');
+        });
+      });
     }
 
     /* ---------- Helpers ---------- */
     function distance(lat1, lon1, lat2, lon2) {
       const R = 6371000, rad = Math.PI / 180;
       const dLat = (lat2 - lat1) * rad, dLon = (lon2 - lon1) * rad;
-      const a = Math.sin(dLat / 2) ** 2 +
-                Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) ** 2;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
       return 2 * R * Math.asin(Math.sqrt(a));
     }
 
@@ -309,7 +557,9 @@
     }
 
     function escapeHtml(s) {
-      return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      return String(s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
     }
   </script>
 </body>
