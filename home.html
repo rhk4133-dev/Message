@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Home</title>
+  <style>
+    :root {
+      --accent: #0b5ed7;
+      --text: #1c2430;
+      --muted: #7a8494;
+      --line: #e3e7ed;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text);
+      padding: 22px 18px;
+    }
+
+    /* Primary text */
+    h1 {
+      font-size: 26px;
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+
+    /* Secondary buttons */
+    .quick {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+    .quick button {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 0;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: #fff;
+      font: inherit;
+      font-size: 13px;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .quick button svg {
+      width: 17px;
+      height: 17px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .quick button.active {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+    }
+
+    /* Stop cards */
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 12px;
+      background: #fff;
+    }
+    .top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .num {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #eaf1fd;
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .title { flex: 1; font-size: 16px; font-weight: 600; }
+    .dist { text-align: right; font-size: 17px; font-weight: 700; color: var(--accent); white-space: nowrap; }
+
+    .dir {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .dir svg {
+      width: 15px;
+      height: 15px;
+      stroke: var(--muted);
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .chip {
+      font-size: 12px;
+      padding: 4px 9px;
+      border-radius: 12px;
+      background: #f2f4f7;
+      color: #3b4656;
+    }
+    .nodata { margin-top: 10px; font-size: 12px; color: var(--muted); }
+
+    .msg { font-size: 14px; color: var(--muted); padding: 8px 0; }
+  </style>
+</head>
+<body>
+
+  <h1>Quick access</h1>
+
+  <div class="quick">
+    <button data-type="bus" class="active">
+      <svg viewBox="0 0 24 24">
+        <rect x="4" y="3.5" width="16" height="14" rx="3"/>
+        <path d="M4 11h16"/>
+        <path d="M7 17.5V20M17 17.5V20"/>
+      </svg>
+      Bus
+    </button>
+    <button data-type="metro">
+      <svg viewBox="0 0 24 24">
+        <rect x="5" y="3" width="14" height="14" rx="4"/>
+        <path d="M5 11h14"/>
+        <path d="m8 21 2-4M16 21l-2-4"/>
+      </svg>
+      Metro
+    </button>
+    <button data-type="rail">
+      <svg viewBox="0 0 24 24">
+        <path d="M7 3h10v12a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V3Z"/>
+        <path d="M7 9h10"/>
+        <path d="M6 21l2.5-4M18 21l-2.5-4"/>
+      </svg>
+      Railway
+    </button>
+  </div>
+
+  <div id="results"></div>
+
+  <script>
+    const labels = { bus: 'bus stops', metro: 'metro stations', rail: 'railway stations' };
+    const results = document.getElementById('results');
+    const cache = {};
+    let myPos = null;
+
+    document.querySelectorAll('.quick button').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('.quick button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        start(btn.dataset.type);
+      });
+    });
+
+    // Load nearby bus stops automatically when the page opens
+    start('bus');
+
+    function show(text) {
+      results.innerHTML = '<p class="msg">' + text + '</p>';
+    }
+
+    function start(type) {
+      if (cache[type]) { render(cache[type], type); return; }
+      show('Finding your location...');
+      if (myPos) { search(type); return; }
+
+      if (!navigator.geolocation) { show('Location is not supported on this device.'); return; }
+
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        myPos = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+        search(type);
+      }, function () {
+        show('Could not get your location. Please turn on location and allow permission.');
+      }, { enableHighAccuracy: true, timeout: 15000 });
+    }
+
+    /* ---------- Overpass query ---------- */
+    function buildQuery(type, r) {
+      const a = '(around:' + r + ',' + myPos.lat + ',' + myPos.lon + ')';
+      let body = '';
+      if (type === 'bus') {
+        body = 'node["highway"="bus_stop"]' + a + ';';
+      } else if (type === 'metro') {
+        body = 'node["railway"="station"]["station"="subway"]' + a + ';' +
+               'node["railway"="station"]["subway"="yes"]' + a + ';';
+      } else {
+        body = 'node["railway"="station"]["station"!="subway"]["subway"!="yes"]' + a + ';' +
+               'node["railway"="halt"]' + a + ';';
+      }
+      return '[out:json][timeout:20];(' + body + ');out 200;';
+    }
+
+    async function search(type) {
+      const radii = [1500, 5000, 15000, 40000];
+      show('Searching nearby ' + labels[type] + '...');
+
+      try {
+        for (const r of radii) {
+          const res = await fetch('https://overpass-api.de/api/interpreter?data=' +
+                                  encodeURIComponent(buildQuery(type, r)));
+          const data = await res.json();
+          const list = pickThree(data.elements, type);
+          if (list.length >= 3 || r === radii[radii.length - 1]) {
+            cache[type] = list;
+            render(list, type);
+            return;
+          }
+        }
+      } catch (e) {
+        show('Could not load data. Check your internet and try again.');
+      }
+    }
+
+    function pickThree(elements, type) {
+      const withDist = elements.map(function (el) {
+        const t = el.tags || {};
+        return {
+          name: t.name || (type === 'bus' ? 'Bus stop' : 'Station'),
+          dist: distance(myPos.lat, myPos.lon, el.lat, el.lon),
+          dir: direction(myPos.lat, myPos.lon, el.lat, el.lon),
+          info: details(t)
+        };
+      }).sort((x, y) => x.dist - y.dist);
+
+      // skip duplicates (same name very close, e.g. opposite sides of the road)
+      const out = [];
+      withDist.forEach(function (p) {
+        if (out.length >= 3) { return; }
+        const dup = out.some(o => o.name === p.name && Math.abs(o.dist - p.dist) < 150);
+        if (!dup) { out.push(p); }
+      });
+      return out;
+    }
+
+    // Build the small info tags from whatever data the stop has
+    function details(t) {
+      const info = [];
+      if (t.ref) { info.push('Stop no. ' + t.ref); }
+      if (t.local_ref) { info.push('Code ' + t.local_ref); }
+      if (t.route_ref) { info.push('Routes ' + t.route_ref.replace(/;/g, ', ')); }
+      if (t.line) { info.push('Line ' + t.line.replace(/;/g, ', ')); }
+      if (t.operator) { info.push(t.operator); }
+      else if (t.network) { info.push(t.network); }
+      if (t.shelter === 'yes') { info.push('Shelter'); }
+      if (t.bench === 'yes') { info.push('Bench'); }
+      if (t.lit === 'yes') { info.push('Lit at night'); }
+      if (t.wheelchair === 'yes') { info.push('Wheelchair access'); }
+      return info;
+    }
+
+    function render(list, type) {
+      if (!list.length) { show('No ' + labels[type] + ' found near you.'); return; }
+      const arrow = '<svg viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></svg>';
+
+      results.innerHTML = list.map(function (p, i) {
+        const chips = p.info.length
+          ? '<div class="chips">' + p.info.map(x => '<span class="chip">' + escapeHtml(x) + '</span>').join('') + '</div>'
+          : '<div class="nodata">No extra details available</div>';
+
+        return '<div class="card">' +
+          '<div class="top">' +
+            '<div class="num">' + (i + 1) + '</div>' +
+            '<div class="title">' + escapeHtml(p.name) + '</div>' +
+            '<div class="dist">' + fmt(p.dist) + '</div>' +
+          '</div>' +
+          '<div class="dir">' + arrow + p.dir + ' of you</div>' +
+          chips +
+        '</div>';
+      }).join('');
+    }
+
+    /* ---------- Helpers ---------- */
+    function distance(lat1, lon1, lat2, lon2) {
+      const R = 6371000, rad = Math.PI / 180;
+      const dLat = (lat2 - lat1) * rad, dLon = (lon2 - lon1) * rad;
+      const a = Math.sin(dLat / 2) ** 2 +
+                Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(a));
+    }
+
+    function direction(lat1, lon1, lat2, lon2) {
+      const rad = Math.PI / 180;
+      const y = Math.sin((lon2 - lon1) * rad) * Math.cos(lat2 * rad);
+      const x = Math.cos(lat1 * rad) * Math.sin(lat2 * rad) -
+                Math.sin(lat1 * rad) * Math.cos(lat2 * rad) * Math.cos((lon2 - lon1) * rad);
+      const deg = (Math.atan2(y, x) / rad + 360) % 360;
+      const names = ['North', 'North-east', 'East', 'South-east', 'South', 'South-west', 'West', 'North-west'];
+      return names[Math.round(deg / 45) % 8];
+    }
+
+    function fmt(m) {
+      return m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(1) + ' km';
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+  </script>
+</body>
+</html>
