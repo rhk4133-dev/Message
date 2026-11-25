@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Assistant</title>
+</head>
+<body>
+<script>
+/* ========== SETTINGS (improve here) ========== */
+const CONFIG = {
+  turnMinAngle: 35,      // degrees needed to count as a turn
+  lookMetres: 12,        // how far before/after a point to measure the turn
+  minTurnGap: 25,        // metres between two turns
+  offRouteMetres: 60,    // farther than this = off route
+  offRouteEvery: 20000,  // ms between "off route" messages
+  arriveAt: 30,          // metres from the end = arrived
+  far:  { walk: 100, bike: 150, car: 300 },  // first warning distance
+  near: { walk: 20,  bike: 30,  car: 50  }   // "turn now" distance
+};
+
+/* ========== WORDS (change or translate here) ========== */
+const WORDS = {
+  start:  'Starting. Head {dir}.',
+  far:    'In {dist}, {turn}.',
+  near:   '{Turn} now.',
+  arrive: 'You have arrived at {name}.',
+  off:    'You are off the route. Please go back to the blue line.',
+  straight: 'Go straight. {dist} to your destination.',
+  turns: {
+    left: 'turn left', right: 'turn right',
+    slightLeft: 'bear left', slightRight: 'bear right',
+    sharpLeft: 'turn sharp left', sharpRight: 'turn sharp right',
+    uturn: 'make a U-turn'
+  },
+  dirs: ['north','north-east','east','south-east','south','south-west','west','north-west']
+};
+
+/* ========== STATE ========== */
+let pts = [], cum = [], turns = [], total = 0;
+let mode = 'walk', destName = 'your destination';
+let idx = 0, arrived = false, lastOff = 0;
+
+/* ========== MATH ========== */
+const rad = d => d * Math.PI / 180;
+function dist(a, b) {
+  const R = 6371000;
+  const dLat = rad(b[0] - a[0]), dLon = rad(b[1] - a[1]);
+  const x = Math.sin(dLat / 2) ** 2 +
+            Math.cos(rad(a[0])) * Math.cos(rad(b[0])) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
+function bearing(a, b) {
+  const y = Math.sin(rad(b[1] - a[1])) * Math.cos(rad(b[0]));
+  const x = Math.cos(rad(a[0])) * Math.sin(rad(b[0])) -
+            Math.sin(rad(a[0])) * Math.cos(rad(b[0])) * Math.cos(rad(b[1] - a[1]));
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+function diff(a, b) { return ((b - a + 540) % 360) - 180; }   // + = right, - = left
+
+function kind(d) {
+  const a = Math.abs(d), side = d > 0 ? 'Right' : 'Left';
+  if (a > 165) return 'uturn';
+  if (a >= 125) return 'sharp' + side;
+  if (a < 55) return 'slight' + side;
+  return side.toLowerCase();
+}
+function fmtDist(m) {
+  if (m >= 1000) return (m / 1000).toFixed(1) + ' kilometres';
+  const r = m < 100 ? Math.round(m / 10) * 10 : Math.round(m / 50) * 50;
+  return Math.max(10, r) + ' metres';
+}
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+function fill(t, o) { return t.replace(/\{(\w+)\}/g, (_, k) => o[k] != null ? o[k] : ''); }
+
+/* ========== BUILD TURNS FROM ROUTE ========== */
+function buildTurns() {
+  turns = [];
+  let cand = [];
+  function flush() {
+    if (!cand.length) return;
+    let best = cand[0];
+    cand.forEach(c => { if (Math.abs(c.d) > Math.abs(best.d)) best = c; });
+    const last = turns[turns.length - 1];
+    if (!last || cum[best.i] - last.at >= CONFIG.minTurnGap) {
+      turns.push({ at: cum[best.i], type: kind(best.d), far: false, near: false });
+    }
+    cand = [];
+  }
+  for (let i = 1; i < pts.length - 1; i++) {
+    let b = i, f = i;
+    while (b > 0 && cum[i] - cum[b] < CONFIG.lookMetres) b--;
+    while (f < pts.length - 1 && cum[f] - cum[i] < CONFIG.lookMetres) f++;
+    if (b === i || f === i) continue;
+    const d = diff(bearing(pts[b], pts[i]), bearing(pts[i], pts[f]));
+    if (Math.abs(d) >= CONFIG.turnMinAngle) cand.push({ i, d }); else flush();
+  }
+  flush();
+}
+
+/* ======== END OF PART 1: paste Part 2 right below this line ======== */
+  /* ========== TALK TO start.html ========== */
+function send(m) { window.parent.postMessage(m, '*'); }
+function say(text) { send({ type: 'say', text }); }
+function banner(text) { send({ type: 'banner', text }); }
+
+window.addEventListener('message', function (e) {
+  const m = e.data || {};
+  if (m.type === 'route') {
+    pts = m.points || [];
+    mode = m.mode || 'walk';
+    destName = m.destName || 'your destination';
+    cum = [0];
+    for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + dist(pts[i - 1], pts[i]));
+    total = cum[cum.length - 1] || 0;
+    idx = 0; arrived = false; lastOff = 0;
+    buildTurns();
+    if (pts.length > 1) {
+      let j = 1;
+      while (j < pts.length - 1 && cum[j] < 25) j++;
+      const dir = WORDS.dirs[Math.round(bearing(pts[0], pts[j]) / 45) % 8];
+      say(fill(WORDS.start, { dir }));
+    }
+  } else if (m.type === 'pos') {
+    onPos(m.pos);
+  } else if (m.type === 'stop') {
+    pts = []; turns = []; arrived = true;
+  }
+});
+
+/* ========== MAIN: called with every new GPS position ========== */
+function onPos(p) {
+  if (!pts.length || arrived || !p) return;
+
+  // find nearest route point (look ahead first so we never jump back)
+  let best = idx, bd = 1e12;
+  const end = Math.min(pts.length - 1, idx + 40);
+  for (let i = Math.max(0, idx - 2); i <= end; i++) {
+    const d = dist(p, pts[i]);
+    if (d < bd) { bd = d; best = i; }
+  }
+  if (bd > CONFIG.offRouteMetres) {                 // search the whole route
+    for (let i = 0; i < pts.length; i++) {
+      const d = dist(p, pts[i]);
+      if (d < bd) { bd = d; best = i; }
+    }
+    if (bd > CONFIG.offRouteMetres) {
+      const now = Date.now();
+      if (now - lastOff > CONFIG.offRouteEvery) { lastOff = now; say(WORDS.off); }
+      banner('Off route');
+      return;
+    }
+  }
+  idx = best;
+
+  const progress = cum[idx];
+  const remaining = total - progress;
+
+  if (remaining <= CONFIG.arriveAt) {
+    arrived = true;
+    say(fill(WORDS.arrive, { name: destName }));
+    banner('You have arrived');
+    return;
+  }
+
+  // skip turns already passed
+  turns.forEach(t => { if (t.at < progress - 3) { t.far = true; t.near = true; } });
+
+  const t = turns.find(x => x.at >= progress - 3);
+  if (!t) {
+    banner(fill(WORDS.straight, { dist: fmtDist(remaining) }));
+    return;
+  }
+
+  const d = t.at - progress;
+  const txt = WORDS.turns[t.type];
+  banner(cap(txt) + ' in ' + fmtDist(d));
+
+  if (d <= CONFIG.near[mode] && !t.near) {
+    t.near = true; t.far = true;
+    say(fill(WORDS.near, { Turn: cap(txt) }));
+  } else if (d <= CONFIG.far[mode] && !t.far) {
+    t.far = true;
+    say(fill(WORDS.far, { dist: fmtDist(d), turn: txt }));
+  }
+}
+</script>
+</body>
+</html>
