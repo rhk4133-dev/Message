@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Start</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <style>
+    :root {
+      --accent: #0b5ed7;
+      --text: #1c2430;
+      --muted: #7a8494;
+      --line: #e3e7ed;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    [hidden] { display: none !important; }
+    html, body { height: 100%; }
+    body {
+      font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text);
+      background: #fff;
+    }
+
+    /* ---------- Screen 1: choose Walk / Bike / Car ---------- */
+    #choose { padding: 18px 18px 28px; }
+    #backBtn {
+      border: 0;
+      background: none;
+      color: var(--accent);
+      font: inherit;
+      font-size: 15px;
+      padding: 4px 0;
+      margin-bottom: 8px;
+      cursor: pointer;
+    }
+    #choose h1 { font-size: 24px; font-weight: 700; margin-bottom: 6px; }
+    #destLine {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      color: #556072;
+      margin-bottom: 20px;
+    }
+    #destLine svg {
+      width: 17px; height: 17px; flex-shrink: 0;
+      stroke: #d93025; fill: none;
+      stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    }
+
+    .mode {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      width: 100%;
+      padding: 16px;
+      margin-bottom: 12px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      font: inherit;
+      text-align: left;
+      color: var(--text);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .mode:active { transform: scale(0.99); }
+    .mode.disabled { opacity: 0.55; pointer-events: none; }
+    .mode.suggested { border: 2px solid var(--accent); background: #f3f7ff; padding: 15px; }
+    .mode .ico {
+      width: 46px; height: 46px;
+      border-radius: 50%;
+      background: #eaf1fd;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .mode .ico svg {
+      width: 26px; height: 26px;
+      stroke: var(--accent); fill: none;
+      stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+    }
+    .mode .txt { flex: 1; }
+    .mode .nm { font-size: 18px; font-weight: 700; }
+    .mode .sub { font-size: 14px; color: #556072; margin-top: 3px; }
+    .mode .tag {
+      position: absolute;
+      top: -10px; right: 14px;
+      padding: 3px 10px;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .note { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+    .msg { font-size: 15px; color: var(--muted); padding: 24px 0; line-height: 1.5; }
+
+    /* ---------- Screen 2: navigation ---------- */
+    #nav { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #e9edf3; }
+    #map { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
+
+    #topCard {
+      position: absolute;
+      top: 12px; left: 12px; right: 12px;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 1px 8px rgba(0, 0, 0, 0.25);
+    }
+    #topCard .mi {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: #eaf1fd;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    #topCard .mi svg {
+      width: 20px; height: 20px;
+      stroke: var(--accent); fill: none;
+      stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+    }
+    #topCard .info { flex: 1; min-width: 0; }
+    #tTitle {
+      font-size: 15px; font-weight: 700;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #tSub { font-size: 12px; color: #556072; margin-top: 2px; }
+
+    #bottomCard {
+      position: absolute;
+      left: 12px; right: 12px; bottom: 16px;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: #fff;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+    }
+    #bottomCard .left { flex: 1; min-width: 0; }
+    #rem { font-size: 22px; font-weight: 700; }
+    #eta { font-size: 13px; color: #556072; margin-top: 2px; }
+    #endBtn {
+      border: 0;
+      border-radius: 20px;
+      padding: 10px 20px;
+      background: #d93025;
+      color: #fff;
+      font: inherit;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    #bottomCard.arrived #rem { color: #188038; }
+
+    #recenter {
+      position: absolute;
+      right: 14px;
+      bottom: 96px;
+      z-index: 1000;
+      width: 46px; height: 46px;
+      border: 0;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+    }
+    #recenter svg {
+      width: 24px; height: 24px;
+      stroke: var(--accent); fill: none;
+      stroke-width: 1.8; stroke-linecap: round;
+    }
+
+    /* Your arrow (turns with the phone) */
+    .me-arrow { width: 46px; height: 46px; }
+    .me-arrow .arr {
+      width: 46px; height: 46px;
+      transform-origin: 50% 50%;
+      transition: transform 0.15s linear;
+    }
+    .me-arrow svg { width: 46px; height: 46px; display: block; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.4)); }
+
+    /* Destination pin + label */
+    .dest-pin svg { width: 34px; height: 34px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4)); }
+    .dest-label.leaflet-tooltip {
+      background: #d93025;
+      color: #fff;
+      border: 0;
+      border-radius: 6px;
+      padding: 4px 9px;
+      font-size: 12px;
+      font-weight: 700;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    }
+    .dest-label.leaflet-tooltip-top:before { border-top-color: #d93025; }
+  </style>
+</head>
+<body>
+
+<!-- Screen 1 -->
+  <section id="choose">
+    <button id="backBtn">&#8249; Back</button>
+    <h1>How do you want to go?</h1>
+    <div id="destLine">
+      <svg viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></svg>
+      <span id="destName"></span>
+    </div>
+    <div id="modes"></div>
+    <p class="note" id="note"></p>
+  </section>
+
+  <!-- Screen 2 -->
+  <section id="nav" hidden>
+    <div id="map"></div>
+
+    <div id="topCard">
+      <div class="mi" id="tIcon"></div>
+      <div class="info">
+        <div id="tTitle"></div>
+        <div id="tSub"></div>
+      </div>
+    </div>
+
+    <button id="recenter" hidden aria-label="Back to my location">
+      <svg viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="6.5"/>
+        <circle cx="12" cy="12" r="1.8" fill="#0b5ed7"/>
+        <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+      </svg>
+    </button>
+
+    <div id="bottomCard">
+      <div class="left">
+        <div id="rem">--</div>
+        <div id="eta"></div>
+      </div>
+      <button id="endBtn">End</button>
+    </div>
+  </section>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script>
+    /* ---------- Settings you can change ---------- */
+    const WALK_MAX = 1500;     // up to this many metres: suggest Walk
+    const BIKE_MAX = 6000;     // up to this many metres: suggest Bike, longer: Car
+    const ARRIVE_AT = 30;      // metres from the stop = "arrived"
+
+    const ROUTE_COLOR   = '#1a73e8';
+    const ROUTE_WIDTH   = 6;
+    const OUTLINE_COLOR = '#ffffff';
+    const OUTLINE_WIDTH = 10;
+
+    const ICONS = {
+      walk: '<svg viewBox="0 0 24 24"><circle cx="13" cy="4.2" r="1.8"/><path d="M13 7 11 13M11 13 8 20M11 13l3 3v4M13 8l3 3M13 8 9 10"/></svg>',
+      bike: '<svg viewBox="0 0 24 24"><circle cx="6" cy="16" r="3.5"/><circle cx="18" cy="16" r="3.5"/><path d="M6 16l3.5-7.5H14M9.5 8.5 12 16M12 16l4.5-7.5M14 8.5l4 7.5"/></svg>',
+      car:  '<svg viewBox="0 0 24 24"><path d="M3.5 14.5V11l2-5h13l2 5v3.5"/><path d="M3.5 11h17"/><circle cx="7.5" cy="16" r="1.6"/><circle cx="16.5" cy="16" r="1.6"/></svg>'
+    };
+
+    // speed (km/h) is only used to estimate the time
+    const MODES = {
+      walk: { name: 'Walk', verb: 'Walking', speed: 5,  svc: 'routed-foot' },
+      bike: { name: 'Bike', verb: 'Cycling', speed: 15, svc: 'routed-bike' },
+      car:  { name: 'Car',  verb: 'Driving', speed: 30, svc: 'routed-car' }
+    };
+
+    /* ---------- Read the route sent from map.html ---------- */
+    const q = new URLSearchParams(location.search);
+    let saved = null;
+    try { saved = JSON.parse(sessionStorage.getItem('rhk_route') || 'null'); } catch (e) {}
+
+    let from = null, dest = null, baseDist = null, basePoints = null;
+
+    if (q.get('dlat') && q.get('slat')) {
+      from = [parseFloat(q.get('slat')), parseFloat(q.get('slon'))];
+      dest = { lat: parseFloat(q.get('dlat')), lon: parseFloat(q.get('dlon')), name: q.get('name') || 'Destination' };
+      baseDist = parseFloat(q.get('dist')) || null;
+    } else if (saved && saved.dest && saved.from) {
+      from = saved.from;
+      dest = saved.dest;
+    }
+    if (saved && saved.dest && dest &&
+        Math.abs(saved.dest.lat - dest.lat) < 0.00001 && Math.abs(saved.dest.lon - dest.lon) < 0.00001) {
+      basePoints = saved.points || null;
+      if (saved.distance) { baseDist = saved.distance; }
+    }
+
+    const chooseEl = document.getElementById('choose');
+    const navEl = document.getElementById('nav');
+    const modesEl = document.getElementById('modes');
+
+    document.getElementById('backBtn').addEventListener('click', function () {
+      if (history.length > 1) { history.back(); } else { location.href = 'map.html'; }
+    });
+
+    if (!from || !dest || isNaN(dest.lat) || isNaN(from[0])) {
+      document.getElementById('destLine').style.display = 'none';
+      modesEl.innerHTML = '<p class="msg">No route found. Go back, tap a stop on the Home page, then press Start on the map.</p>';
+    } else {
+      initChoose();
+    }
+
+    /* ---------- Helpers ---------- */
+    function metres(a, b) {                       // a, b = [lat, lon]
+      const R = 6371000, rad = Math.PI / 180;
+      const dLat = (b[0] - a[0]) * rad, dLon = (b[1] - a[1]) * rad;
+      const x = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(a[0] * rad) * Math.cos(b[0] * rad) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      return 2 * R * Math.asin(Math.sqrt(x));
+    }
+    function fmtDist(m) { return m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(1) + ' km'; }
+    function secondsFor(m, key) { return m / (MODES[key].speed * 1000 / 3600); }
+    function fmtTime(s) {
+      const min = Math.max(1, Math.round(s / 60));
+      if (min < 60) { return min + ' min'; }
+      const h = Math.floor(min / 60), r = min % 60;
+      return h + ' h' + (r ? ' ' + r + ' min' : '');
+    }
+
+    /* ---------- Screen 1 ---------- */
+    const result = {};          // walk / bike / car -> { distance, points, estimated }
+
+    function initChoose() {
+      document.getElementById('destName').textContent = dest.name;      // textContent: safe
+      document.getElementById('note').textContent = 'Times are estimates. Suggested is picked from the route distance.';
+
+      // three cards, disabled until their route is ready
+      modesEl.innerHTML = '';
+      Object.keys(MODES).forEach(function (key) {
+        const b = document.createElement('button');
+        b.className = 'mode disabled';
+        b.id = 'mode-' + key;
+        b.innerHTML =
+          '<div class="ico">' + ICONS[key] + '</div>' +
+          '<div class="txt"><div class="nm">' + MODES[key].name + '</div>' +
+          '<div class="sub">Checking route...</div></div>';
+        b.addEventListener('click', function () { pick(key); });
+        modesEl.appendChild(b);
+      });
+
+      Object.keys(MODES).forEach(function (key) {
+        getRoute(key).then(function (r) {
+          result[key] = r;
+          fillCard(key);
+          markSuggested();
+        });
+      });
+    }
+
+    function fallbackRoute() {
+      if (basePoints && basePoints.length > 1) {
+        return { distance: baseDist || pathLength(basePoints), points: basePoints, estimated: true };
+      }
+      const straight = metres(from, [dest.lat, dest.lon]) * 1.3;
+      return { distance: straight, points: [from, [dest.lat, dest.lon]], estimated: true };
+    }
+
+    function pathLength(pts) {
+      let s = 0;
+      for (let i = 1; i < pts.length; i++) { s += metres(pts[i - 1], pts[i]); }
+      return s;
+    }
+
+    // Walking, cycling and driving routes from the free OpenStreetMap routing servers
+    function getRoute(key) {
+      const url = 'https://routing.openstreetmap.de/' + MODES[key].svc + '/route/v1/driving/' +
+        from[1] + ',' + from[0] + ';' + dest.lon + ',' + dest.lat +
+        '?overview=full&geometries=geojson';
+
+      const ctrl = new AbortController();
+      const timer = setTimeout(function () { ctrl.abort(); }, 9000);
+
+      return fetch(url, { signal: ctrl.signal })
+        .then(function (r) { clearTimeout(timer); return r.json(); })
+        .then(function (data) {
+          if (!data.routes || !data.routes.length) { throw new Error('no route'); }
+          const rt = data.routes[0];
+          const pts = rt.geometry.coordinates.map(function (c) { return [c[1], c[0]]; });
+          return { distance: rt.distance, points: pts, estimated: false };
+        })
+        .catch(function () {
+          clearTimeout(timer);
+          // car can use the route already drawn on the map
+          if (key === 'car' && basePoints && basePoints.length > 1) {
+            return { distance: baseDist || pathLength(basePoints), points: basePoints, estimated: false };
+          }
+          return fallbackRoute();
+        });
+    }
+
+    function fillCard(key) {
+      const r = result[key];
+      const card = document.getElementById('mode-' + key);
+      const approx = r.estimated ? '~' : '';
+      card.querySelector('.sub').textContent =
+        approx + fmtTime(secondsFor(r.distance, key)) + '  \u00b7  ' + approx + fmtDist(r.distance);
+      card.classList.remove('disabled');
+    }
+
+    // Suggested mode comes from the route distance
+    function markSuggested() {
+      const d = baseDist != null ? baseDist : (result.car ? result.car.distance : null);
+      if (d == null) { return; }
+      const key = d <= WALK_MAX ? 'walk' : (d <= BIKE_MAX ? 'bike' : 'car');
+
+      document.querySelectorAll('.mode').forEach(function (c) {
+        c.classList.remove('suggested');
+        const old = c.querySelector('.tag');
+        if (old) { old.remove(); }
+      });
+      const card = document.getElementById('mode-' + key);
+      if (!card) { return; }
+      card.classList.add('suggested');
+      const tag = document.createElement('span');
+      tag.className = 'tag';
+      tag.textContent = 'Suggested';
+      card.appendChild(tag);
+    }
+
+    function pick(key) {
+      if (!result[key]) { return; }
+      // iPhone needs a tap before it allows the compass: this tap is that tap
+      enableCompass().then(function () { startNav(key); });
+    }
+
+    /* ---------- Compass (arrow turns with the phone) ---------- */
+    let compassOK = false, shownHeading = 0, arrowEl = null, compassOn = false;
+
+    function enableCompass() {
+      const D = window.DeviceOrientationEvent;
+      if (D && typeof D.requestPermission === 'function') {          // iPhone
+        return D.requestPermission().then(function (s) {
+          if (s === 'granted') { listenCompass(); }
+        }).catch(function () {});
+      }
+      listenCompass();
+      return Promise.resolve();
+    }
+
+    function listenCompass() {
+      if (compassOn) { return; }
+      compassOn = true;
+      if ('ondeviceorientationabsolute' in window) {
+        window.addEventListener('deviceorientationabsolute', onOrient, true);
+      } else {
+        window.addEventListener('deviceorientation', onOrient, true);
+      }
+    }
+
+    // heading from alpha / beta / gamma, also when the phone is held upright
+    function compassHeading(alpha, beta, gamma) {
+      const d = Math.PI / 180;
+      const x = beta * d, y = gamma * d, z = alpha * d;
+      const cY = Math.cos(y), cZ = Math.cos(z), sX = Math.sin(x), sY = Math.sin(y), sZ = Math.sin(z);
+      const Vx = -cZ * sY - sZ * sX * cY;
+      const Vy = -sZ * sY + cZ * sX * cY;
+      let h = Math.atan(Vx / Vy);
+      if (Vy < 0) { h += Math.PI; } else if (Vx < 0) { h += 2 * Math.PI; }
+      return h * (180 / Math.PI);
+    }
+
+    function onOrient(e) {
+      let h = null;
+      if (typeof e.webkitCompassHeading === 'number' && !isNaN(e.webkitCompassHeading)) {
+        h = e.webkitCompassHeading;                                   // iPhone
+      } else if (e.alpha != null && e.beta != null && e.gamma != null &&
+                 (e.absolute || e.type === 'deviceorientationabsolute')) {
+        h = compassHeading(e.alpha, e.beta, e.gamma);                 // Android
+      }
+      if (h == null) { return; }
+      const ang = (screen.orientation && typeof screen.orientation.angle === 'number') ? screen.orientation.angle : 0;
+      compassOK = true;
+      setHeading((h + ang) % 360);
+    }
+
+    // smooth turning, always the short way round
+    function setHeading(h) {
+      const diff = ((h - shownHeading + 540) % 360) - 180;
+      shownHeading = (shownHeading + diff * 0.3 + 360) % 360;
+      if (arrowEl) { arrowEl.style.transform = 'rotate(' + shownHeading + 'deg)'; }
+    }
+
+    /* ---------- Screen 2: navigation ---------- */
+    let map = null, meMarker = null, myPos = null, follow = true, finished = false;
+    let routePts = [], cum = [], total = 0, current = null;
+
+    function startNav(key) {
+      current = key;
+      const m = MODES[key], r = result[key];
+
+      chooseEl.hidden = true;
+      navEl.hidden = false;
+
+      routePts = r.points;
+      cum = [0];
+      for (let i = 1; i < routePts.length; i++) { cum.push(cum[i - 1] + metres(routePts[i - 1], routePts[i])); }
+      total = cum[cum.length - 1] || r.distance;
+
+      document.getElementById('tIcon').innerHTML = ICONS[key];
+      document.getElementById('tTitle').textContent = m.verb + ' to ' + dest.name;     // safe
+      document.getElementById('tSub').textContent = 'Turn your phone and the arrow turns with you';
+
+      map = L.map('map', { zoomControl: false, center: from, zoom: 18 });
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+
+      // route line: white outline, blue line on top
+      L.polyline(routePts, { color: OUTLINE_COLOR, weight: OUTLINE_WIDTH, opacity: 1, lineJoin: 'round', lineCap: 'round' }).addTo(map);
+      L.polyline(routePts, { color: ROUTE_COLOR, weight: ROUTE_WIDTH, opacity: 1, lineJoin: 'round', lineCap: 'round' }).addTo(map);
+
+      // destination pin
+      L.marker([dest.lat, dest.lon], {
+        icon: L.divIcon({
+          className: 'dest-pin',
+          html: '<svg viewBox="0 0 24 24" fill="#d93025" stroke="#fff" stroke-width="1.5" stroke-linejoin="round">' +
+                '<path d="M12 22s-7-5.8-7-12a7 7 0 0 1 14 0c0 6.2-7 12-7 12Z"/>' +
+                '<circle cx="12" cy="10" r="2.6" fill="#fff" stroke="none"/></svg>',
+          iconSize: [34, 34],
+          iconAnchor: [17, 32]
+        }),
+        zIndexOffset: 900
+      }).addTo(map).bindTooltip('Destination', {
+        permanent: true, direction: 'top', offset: [0, -34], className: 'dest-label'
+      });
+
+      // your arrow
+      const arrowSvg =
+        '<svg viewBox="0 0 46 46">' +
+        '<circle cx="23" cy="23" r="20" fill="rgba(26,115,232,0.18)"/>' +
+        '<path d="M23 6 34 38 23 31 12 38Z" fill="#1a73e8" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/>' +
+        '</svg>';
+      meMarker = L.marker(from, {
+        icon: L.divIcon({
+          className: 'me-arrow',
+          html: '<div class="arr">' + arrowSvg + '</div>',
+          iconSize: [46, 46],
+          iconAnchor: [23, 23]
+        }),
+        zIndexOffset: 1000
+      }).addTo(map);
+      arrowEl = meMarker.getElement().querySelector('.arr');
+      arrowEl.style.transform = 'rotate(' + shownHeading + 'deg)';
+
+      myPos = from;
+      showProgress(from);
+
+      // map follows you until you drag it
+      map.on('dragstart', function () {
+        follow = false;
+        document.getElementById('recenter').hidden = false;
+      });
+      document.getElementById('recenter').addEventListener('click', function () {
+        follow = true;
+        this.hidden = true;
+        if (myPos) { map.setView(myPos, Math.max(map.getZoom(), 17)); }
+      });
+      document.getElementById('endBtn').addEventListener('click', goHome);
+
+      if (navigator.geolocation) {
+        navigator.geolocation.watchPosition(onPosition, function () {
+          document.getElementById('tSub').textContent = 'Turn on location to see where you are';
+        }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 });
+      }
+
+      // no compass after a few seconds: say the arrow will follow your movement
+      setTimeout(function () {
+        if (!compassOK) {
+          document.getElementById('tSub').textContent = 'No compass found, the arrow follows your direction of movement';
+        }
+      }, 4000);
+    }
+
+    function onPosition(pos) {
+      myPos = [pos.coords.latitude, pos.coords.longitude];
+      meMarker.setLatLng(myPos);
+
+      // no compass: use the direction you are moving in
+      if (!compassOK && pos.coords.heading != null && !isNaN(pos.coords.heading) && (pos.coords.speed || 0) > 0.8) {
+        setHeading(pos.coords.heading);
+      }
+
+      if (follow) { map.setView(myPos, Math.max(map.getZoom(), 17), { animate: true }); }
+      showProgress(myPos);
+    }
+
+    // distance left along the route, time left, and "arrived"
+    function showProgress(p) {
+      let best = 0, bd = Infinity;
+      for (let i = 0; i < routePts.length; i++) {
+        const d = metres(p, routePts[i]);
+        if (d < bd) { bd = d; best = i; }
+      }
+      const left = Math.max(0, total - cum[best]) + bd;
+      const toDest = metres(p, [dest.lat, dest.lon]);
+      const card = document.getElementById('bottomCard');
+
+      if (toDest <= ARRIVE_AT || finished) {
+        finished = true;
+        card.classList.add('arrived');
+        document.getElementById('rem').textContent = 'You have arrived';
+        document.getElementById('eta').textContent = dest.name;
+        return;
+      }
+
+      document.getElementById('rem').textContent = fmtDist(left);
+      document.getElementById('eta').textContent = fmtTime(secondsFor(left, current)) + ' left';
+    }
+
+    // End: back to the Home page
+    function goHome() {
+      try {
+        if (window.parent && window.parent !== window && typeof window.parent.go === 'function') {
+          window.parent.go('home.html', window.parent.document.getElementById('homeBtn'));
+          return;
+        }
+      } catch (e) {}
+      location.href = 'home.html';
+    }
+  </script>
+</body>
+</html>
