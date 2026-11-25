@@ -56,93 +56,72 @@
     }
     .top { display: flex; align-items: center; gap: 12px; }
 
-    /* ---------- Photo card ---------- */
+    /* ---------- Photo card: photo is the whole background ---------- */
     .card.photo {
-      padding: 0;
-      overflow: hidden;
-      box-shadow: 0 1px 6px rgba(20, 30, 50, 0.1);
-    }
-
-    /* photo area: full photo is always visible */
-    .pic {
-      position: relative;
-      height: 200px;
-      overflow: hidden;
-      background: #e9edf3;
-    }
-    .pic .blur {
-      position: absolute;
-      top: -12px; left: -12px; right: -12px; bottom: -12px;
+      min-height: 140px;
+      border: 0;
+      background-color: #2b3a55;
       background-size: cover;
       background-position: center;
-      filter: blur(14px);
-      opacity: 0;
-      transition: opacity 0.3s;
+      box-shadow: 0 1px 6px rgba(20, 30, 50, 0.12);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 0.1s;
     }
-    .pic img {
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-    .pic.ready .blur, .pic.ready img { opacity: 1; }
+    .card.photo:active { transform: scale(0.985); }
+    .card.photo .top { align-items: flex-start; }
 
-    /* number + distance on the photo */
-    .topbar {
-      position: absolute;
-      top: 10px; left: 10px; right: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      z-index: 2;
-    }
-    .num {
+    .card.photo .num {
       width: 30px; height: 30px;
       border-radius: 50%;
-      background: #fff;
+      background: rgba(255, 255, 255, 0.92);
       color: var(--accent);
       font-size: 14px; font-weight: 700;
       display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
-    }
-    .dist {
-      padding: 5px 12px;
-      border-radius: 16px;
-      background: #fff;
-      color: var(--accent);
-      font-size: 15px; font-weight: 700;
-      white-space: nowrap;
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+      flex-shrink: 0;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
     }
 
-    /* text area below the photo */
-    .panel { background: #fff; padding: 12px 14px 14px; }
-    .title { font-size: 16px; font-weight: 700; color: var(--text); line-height: 1.25; }
-
-    .dir {
-      display: flex; align-items: center; gap: 6px;
-      margin-top: 6px;
-      font-size: 13px; color: #556072;
+    /* Text colour is chosen per text, from the photo behind it */
+    .card.photo [data-a] {
+      color: #fff;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 8px rgba(0, 0, 0, 0.55);
     }
-    .dir svg {
+    .card.photo [data-a].on-dark {
+      color: #fff;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 8px rgba(0, 0, 0, 0.55);
+    }
+    .card.photo [data-a].on-light {
+      color: #0d1420;
+      text-shadow: 0 0 4px rgba(255, 255, 255, 0.95), 0 0 9px rgba(255, 255, 255, 0.75);
+    }
+
+    .card.photo .title { flex: 1; font-size: 17px; font-weight: 700; line-height: 1.25; padding-top: 4px; }
+    .card.photo .dist { font-size: 16px; font-weight: 700; white-space: nowrap; padding-top: 4px; }
+
+    .card.photo .dir {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 12px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .card.photo .dir svg {
       width: 15px; height: 15px;
-      stroke: var(--accent); fill: none;
+      stroke: currentColor; fill: none;
       stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
     }
 
-    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
-    .chip {
+    .card.photo .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .card.photo .chip {
       font-size: 12px;
-      padding: 4px 9px;
-      border-radius: 12px;
-      background: #e9effa;
-      color: #26426f;
       font-weight: 500;
+      padding: 3px 9px;
+      border-radius: 12px;
+      border: 1px solid currentColor;
     }
-    .nodata { margin-top: 8px; font-size: 12px; color: #6b7686; }
+    .card.photo .nodata { margin-top: 10px; font-size: 12px; font-weight: 500; }
 
     .msg { font-size: 14px; color: var(--muted); padding: 8px 0; }
     .retry {
@@ -228,8 +207,8 @@
   <div id="results"></div>
 
   <script>
-    /* ---------- Your own photos (always included) ---------- */
-    const MY_PHOTOS = {
+    /* ---------- Your 9 photos: card 1, 2, 3 of each type, in order ---------- */
+    const PHOTOS = {
       bus: [
         'https://i.ibb.co/ZRTKXGtB/IMG-49655d47-832e-45ad-8202-42078e0438f0.webp',
         'https://i.ibb.co/sdbR9hQz/IMG-e02c9627-c35e-4cef-97b4-283bdf37bf7f.jpg',
@@ -247,14 +226,6 @@
       ]
     };
 
-    /* ---------- Extra photos loaded from Wikimedia Commons ----------
-       Change these words if you want different kinds of photos. */
-    const SEARCH = {
-      bus:   'BMTC bus Bengaluru',
-      metro: 'Namma Metro Bengaluru train',
-      rail:  'Indian Railways passenger train station'
-    };
-
     const labels = { bus: 'bus stops', metro: 'metro stations', rail: 'railway stations' };
     const servers = [
       'https://overpass-api.de/api/interpreter',
@@ -266,6 +237,7 @@
     const cache = {};
     let myPos = null;
     let currentType = 'bus';
+    let shown = [];            // the 3 stops on screen (used when a card is tapped)
 
     document.querySelectorAll('.quick button').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -314,8 +286,7 @@
         show('Could not get your location. Please turn on location and allow permission.', true);
       }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 });
     }
-
-    /* ---------- Overpass ---------- */
+        /* ---------- Overpass ---------- */
     function buildQuery(type, r) {
       const a = '(around:' + r + ',' + myPos.lat + ',' + myPos.lon + ')';
       let body = '';
@@ -394,6 +365,8 @@
         const t = el.tags || {};
         return {
           name: t.name || (type === 'bus' ? 'Bus stop' : 'Station'),
+          lat: el.lat,
+          lon: el.lon,
           dist: distance(myPos.lat, myPos.lon, el.lat, el.lon),
           dir: direction(myPos.lat, myPos.lon, el.lat, el.lon),
           info: details(t)
@@ -428,110 +401,125 @@
 
     function render(list, type) {
       if (!list.length) { show('No ' + labels[type] + ' found near you.', true); return; }
+      shown = list;
       const pin = '<svg viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></svg>';
 
       results.innerHTML = list.map(function (p, i) {
         const chips = p.info.length
-          ? '<div class="chips">' + p.info.map(function (x) { return '<span class="chip">' + escapeHtml(x) + '</span>'; }).join('') + '</div>'
-          : '<div class="nodata">No extra details available</div>';
+          ? '<div class="chips">' + p.info.map(function (x) { return '<span class="chip" data-a>' + escapeHtml(x) + '</span>'; }).join('') + '</div>'
+          : '<div class="nodata" data-a>No extra details available</div>';
 
         return '<div class="card photo" data-i="' + i + '">' +
-          '<div class="pic">' +
-            '<div class="blur"></div>' +
-            '<img alt="">' +
-            '<div class="topbar">' +
-              '<div class="num">' + (i + 1) + '</div>' +
-              '<div class="dist">' + fmt(p.dist) + '</div>' +
-            '</div>' +
+          '<div class="top">' +
+            '<div class="num">' + (i + 1) + '</div>' +
+            '<div class="title" data-a>' + escapeHtml(p.name) + '</div>' +
+            '<div class="dist" data-a>' + fmt(p.dist) + '</div>' +
           '</div>' +
-          '<div class="panel">' +
-            '<div class="title">' + escapeHtml(p.name) + '</div>' +
-            '<div class="dir">' + pin + p.dir + ' of you</div>' +
-            chips +
-          '</div>' +
+          '<div class="dir" data-a>' + pin + p.dir + ' of you</div>' +
+          chips +
         '</div>';
       }).join('');
 
-      applyPhotos(type);
-    }
-
-    /* ---------- Photos ---------- */
-    function shuffle(arr) {
-      const a = arr.slice();
-      for (let i = a.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        const t = a[i]; a[i] = a[j]; a[j] = t;
-      }
-      return a;
-    }
-
-    // Can this photo load? (gives up after 6 seconds)
-    function canLoad(url) {
-      return new Promise(function (resolve) {
-        const img = new Image();
-        const timer = setTimeout(function () { resolve(false); }, 6000);
-        img.onload = function () { clearTimeout(timer); resolve(true); };
-        img.onerror = function () { clearTimeout(timer); resolve(false); };
-        img.src = url;
+      // card 1, 2, 3 get photo 1, 2, 3 of this type (in order)
+      const urls = PHOTOS[type] || [];
+      results.querySelectorAll('.card.photo').forEach(function (card, i) {
+        if (urls[i]) { loadPhoto(card, urls[i]); }
       });
     }
 
-    // Get extra photos from Wikimedia Commons (free photo library)
-    function commonsPhotos(type) {
-      const ctrl = new AbortController();
-      const timer = setTimeout(function () { ctrl.abort(); }, 5000);
-      const url = 'https://commons.wikimedia.org/w/api.php' +
-        '?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=20' +
-        '&gsrsearch=' + encodeURIComponent(SEARCH[type] + ' filetype:bitmap') +
-        '&prop=imageinfo&iiprop=url|mime&iiurlwidth=900';
+    /* ---------- Tap a card -> open Maps with the route to that stop ---------- */
+    results.addEventListener('click', function (e) {
+      const card = e.target.closest ? e.target.closest('.card.photo') : null;
+      if (!card) { return; }
+      const p = shown[Number(card.dataset.i)];
+      if (p) { openRoute(p); }
+    });
 
-      return fetch(url, { signal: ctrl.signal })
-        .then(function (r) { clearTimeout(timer); return r.json(); })
-        .then(function (data) {
-          const pages = (data.query && data.query.pages) ? Object.values(data.query.pages) : [];
-          return pages.map(function (p) {
-            const info = p.imageinfo && p.imageinfo[0];
-            return (info && info.mime === 'image/jpeg') ? (info.thumburl || info.url) : null;
-          }).filter(Boolean);
-        })
-        .catch(function () { clearTimeout(timer); return []; });
-    }
-
-    // The 3 photos for a type are picked once per visit and then kept.
-    // They are picked again only after the app/tab is closed and opened again.
-    async function getPhotos(type) {
-      const key = 'rhk_photos_' + type;
+    function openRoute(p) {
+      const from = myPos ? { lat: myPos.lat, lon: myPos.lon } : null;
       try {
-        const saved = JSON.parse(sessionStorage.getItem(key) || 'null');
-        if (saved && saved.length) { return saved; }
-      } catch (e) {}
-
-      const extra = await commonsPhotos(type);
-      const pool = shuffle(MY_PHOTOS[type].concat(extra));
-      const tryList = pool.slice(0, 9);
-      const ok = await Promise.all(tryList.map(canLoad));
-      let chosen = tryList.filter(function (u, i) { return ok[i]; }).slice(0, 3);
-
-      if (!chosen.length) { chosen = shuffle(MY_PHOTOS[type]).slice(0, 3); }
-
-      try { sessionStorage.setItem(key, JSON.stringify(chosen)); } catch (e) {}
-      return chosen;
+        if (window.parent && window.parent !== window && typeof window.parent.openMap === 'function') {
+          window.parent.openMap(p.lat, p.lon, p.name, from);
+          return;
+        }
+      } catch (err) {}
+      // fallback: open map.html directly
+      let url = 'map.html?dlat=' + p.lat + '&dlon=' + p.lon + '&name=' + encodeURIComponent(p.name);
+      if (from) { url += '&slat=' + from.lat + '&slon=' + from.lon; }
+      location.href = url;
     }
 
-    function applyPhotos(type) {
-      const cards = results.querySelectorAll('.card.photo');
-      getPhotos(type).then(function (urls) {
-        if (currentType !== type) { return; }
-        cards.forEach(function (card, i) {
-          const pic = card.querySelector('.pic');
-          if (!urls.length) { pic.style.display = 'none'; return; }
-          const url = urls[i % urls.length];
-          card.querySelector('img').src = url;
-          card.querySelector('.blur').style.backgroundImage = 'url("' + url.replace(/"/g, '%22') + '")';
-          pic.classList.add('ready');
+    /* ---------- Photo + text colour that matches the photo ---------- */
+    function loadPhoto(card, url) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';           // lets the app read the photo colours
+      img.onload = function () {
+        card.style.backgroundImage = 'url("' + url.replace(/"/g, '%22') + '")';
+        card._img = img;
+        adapt(card);
+      };
+      img.onerror = function () {
+        // photo site did not allow reading colours: still show the photo,
+        // text stays white with a dark outline
+        const plain = new Image();
+        plain.onload = function () {
+          card.style.backgroundImage = 'url("' + url.replace(/"/g, '%22') + '")';
+        };
+        plain.src = url;
+      };
+      img.src = url;
+    }
+
+    // Look at the photo behind each text, then pick white or dark text
+    function adapt(card) {
+      const img = card._img;
+      const els = card.querySelectorAll('[data-a]');
+      els.forEach(function (el) { el.classList.remove('on-light', 'on-dark'); });
+
+      const w = card.clientWidth, h = card.clientHeight;
+      if (!img || !w || !h) { return; }
+
+      try {
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const ctx = c.getContext('2d', { willReadFrequently: true });
+
+        // same fit as the card background (cover, centered)
+        const s = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+        const dw = img.naturalWidth * s, dh = img.naturalHeight * s;
+        ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+
+        const cr = card.getBoundingClientRect();
+        els.forEach(function (el) {
+          const r = el.getBoundingClientRect();
+          const x = Math.max(0, Math.floor(r.left - cr.left - 4));
+          const y = Math.max(0, Math.floor(r.top - cr.top - 3));
+          const ww = Math.min(w - x, Math.ceil(r.width + 8));
+          const hh = Math.min(h - y, Math.ceil(r.height + 6));
+          if (ww <= 0 || hh <= 0) { el.classList.add('on-dark'); return; }
+
+          const d = ctx.getImageData(x, y, ww, hh).data;
+          let sum = 0, n = 0;
+          for (let i = 0; i < d.length; i += 16) {
+            sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+            n++;
+          }
+          const brightness = sum / n;
+          // bright photo area -> dark text, dark photo area -> white text
+          el.classList.add(brightness > 140 ? 'on-light' : 'on-dark');
         });
-      });
+      } catch (e) {
+        els.forEach(function (el) { el.classList.add('on-dark'); });
+      }
     }
+
+    let resizeTimer = null;
+    window.addEventListener('resize', function () {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(function () {
+        document.querySelectorAll('.card.photo').forEach(adapt);
+      }, 250);
+    });
 
     /* ---------- Helpers ---------- */
     function distance(lat1, lon1, lat2, lon2) {
