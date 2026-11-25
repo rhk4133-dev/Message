@@ -8,6 +8,7 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #map { height: 100%; width: 100%; }
+    body { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
 
     #locBtn {
       position: absolute;
@@ -34,6 +35,73 @@
       stroke-linecap: round;
     }
 
+    /* Start button (shown only when the route is ready) */
+    #startBtn {
+      position: absolute;
+      left: 16px;
+      right: 80px;
+      bottom: 28px;
+      z-index: 1000;
+      height: 48px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 0;
+      border-radius: 24px;
+      background: #1a73e8;
+      color: #fff;
+      font: inherit;
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #startBtn.show { display: flex; }
+    #startBtn:active { transform: scale(0.98); }
+    #startBtn svg {
+      width: 20px;
+      height: 20px;
+      fill: #fff;
+      stroke: #fff;
+      stroke-width: 1.5;
+      stroke-linejoin: round;
+    }
+
+    /* Route info card at the top */
+    #banner {
+      position: absolute;
+      top: 12px; left: 12px; right: 12px;
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 1px 8px rgba(0, 0, 0, 0.25);
+    }
+    #banner.show { display: flex; }
+    #banner .pin { width: 22px; height: 22px; flex-shrink: 0; }
+    #banner .info { flex: 1; min-width: 0; }
+    #banner .name {
+      font-size: 15px; font-weight: 700; color: #1c2430;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #banner .sub { font-size: 13px; color: #556072; margin-top: 2px; }
+    #banner button {
+      border: 0;
+      background: #eef1f5;
+      color: #1c2430;
+      border-radius: 14px;
+      padding: 6px 12px;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
     /* Bus stop icon */
     .bus-icon {
       width: 26px;
@@ -55,6 +123,22 @@
       stroke-linecap: round;
       stroke-linejoin: round;
     }
+
+    /* Destination pin */
+    .dest-pin svg { width: 34px; height: 34px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4)); }
+
+    /* "Destination" text above the pin */
+    .dest-label.leaflet-tooltip {
+      background: #d93025;
+      color: #fff;
+      border: 0;
+      border-radius: 6px;
+      padding: 4px 9px;
+      font-size: 12px;
+      font-weight: 700;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    }
+    .dest-label.leaflet-tooltip-top:before { border-top-color: #d93025; }
 
     /* Your location dot */
     .me-dot {
@@ -78,7 +162,6 @@
       border: 0;
       border-radius: 6px;
       padding: 4px 8px;
-      font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       font-size: 12px;
       font-weight: 600;
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
@@ -90,6 +173,24 @@
 
   <div id="map"></div>
 
+  <div id="banner">
+    <svg class="pin" viewBox="0 0 24 24" fill="none" stroke="#d93025" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z"/>
+      <circle cx="12" cy="10" r="2.3"/>
+    </svg>
+    <div class="info">
+      <div class="name" id="bName"></div>
+      <div class="sub" id="bSub"></div>
+    </div>
+    <button id="bAction" style="display:none"></button>
+    <button id="bClose" aria-label="Clear route">&#10005;</button>
+  </div>
+
+  <button id="startBtn">
+    <svg viewBox="0 0 24 24"><path d="M12 2.5 20 21l-8-4.2L4 21 12 2.5Z"/></svg>
+    Start
+  </button>
+
   <button id="locBtn" aria-label="Current location">
     <svg viewBox="0 0 24 24">
       <circle cx="12" cy="12" r="6.5"/>
@@ -100,6 +201,12 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script>
+    /* ---------- Route line look (change here if you want) ---------- */
+    const ROUTE_COLOR   = '#1a73e8';  // blue line
+    const ROUTE_WIDTH   = 6;          // blue line thickness in px
+    const OUTLINE_COLOR = '#ffffff';  // white outline under the line
+    const OUTLINE_WIDTH = 10;         // outline thickness in px
+
     // Fallback start position if location is not allowed
     const start = [12.9634, 77.5855];
 
@@ -109,11 +216,168 @@
       zoom: 17
     });
 
-    // Standard OpenStreetMap tiles (shows map icons like shops, hospitals, schools)
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
+
+    /* ---------- Destination from the Home page (if any) ---------- */
+    const q = new URLSearchParams(location.search);
+    const dest = q.get('dlat') ? {
+      lat: parseFloat(q.get('dlat')),
+      lon: parseFloat(q.get('dlon')),
+      name: q.get('name') || 'Destination'
+    } : null;
+    const passedStart = (q.get('slat') && q.get('slon'))
+      ? [parseFloat(q.get('slat')), parseFloat(q.get('slon'))] : null;
+
+    let routeLayer = null, destMarker = null, routeBusy = false, routeDone = false, lastFrom = null;
+    let routeInfo = null;     // route details, sent to start.html when Start is tapped
+
+    const banner = document.getElementById('banner');
+    const bName = document.getElementById('bName');
+    const bSub = document.getElementById('bSub');
+    const bAction = document.getElementById('bAction');
+    const startBtn = document.getElementById('startBtn');
+
+    function showBanner(sub, actionText, actionFn) {
+      bName.textContent = dest.name;       // textContent: safe for any name
+      bSub.textContent = sub;
+      if (actionText) {
+        bAction.textContent = actionText;
+        bAction.onclick = actionFn;
+        bAction.style.display = '';
+      } else {
+        bAction.style.display = 'none';
+      }
+      banner.classList.add('show');
+    }
+
+    // X button: clear the route, the pin and the Start button
+    document.getElementById('bClose').addEventListener('click', function () {
+      if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+      if (destMarker) { map.removeLayer(destMarker); destMarker = null; }
+      banner.classList.remove('show');
+      startBtn.classList.remove('show');
+      routeInfo = null;
+      routeDone = true;
+      if (myPos) { map.setView(myPos, 17); }
+    });
+
+    // Start button: go to start.html with the route details
+    startBtn.addEventListener('click', function () {
+      if (!routeInfo) { return; }
+      try { sessionStorage.setItem('rhk_route', JSON.stringify(routeInfo)); } catch (e) {}
+
+      const p = new URLSearchParams();
+      p.set('dlat', routeInfo.dest.lat);
+      p.set('dlon', routeInfo.dest.lon);
+      p.set('name', routeInfo.dest.name);
+      p.set('slat', routeInfo.from[0]);
+      p.set('slon', routeInfo.from[1]);
+      p.set('dist', Math.round(routeInfo.distance));
+      location.href = 'start.html?' + p.toString();
+    });
+
+    function fmt(m) {
+      return m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(1) + ' km';
+    }
+
+    if (dest && !isNaN(dest.lat) && !isNaN(dest.lon)) {
+      destMarker = L.marker([dest.lat, dest.lon], {
+        icon: L.divIcon({
+          className: 'dest-pin',
+          html: '<svg viewBox="0 0 24 24" fill="#d93025" stroke="#fff" stroke-width="1.5" stroke-linejoin="round">' +
+                '<path d="M12 22s-7-5.8-7-12a7 7 0 0 1 14 0c0 6.2-7 12-7 12Z"/>' +
+                '<circle cx="12" cy="10" r="2.6" fill="#fff" stroke="none"/></svg>',
+          iconSize: [34, 34],
+          iconAnchor: [17, 32]
+        }),
+        zIndexOffset: 900
+      }).addTo(map);
+
+      // the text "Destination" above the pin
+      destMarker.bindTooltip('Destination', {
+        permanent: true,
+        direction: 'top',
+        offset: [0, -34],
+        className: 'dest-label'
+      });
+
+      map.setView([dest.lat, dest.lon], 15);
+      showBanner('Finding route...');
+      if (passedStart) { drawRoute(passedStart); }
+      // otherwise the route starts as soon as your location is found (below)
+    }
+
+    /* ---------- Route along the real roads (OSRM, free, no key) ---------- */
+    function drawRoute(from) {
+      if (!dest || routeBusy || routeDone) { return; }
+      routeBusy = true;
+      lastFrom = from;
+      startBtn.classList.remove('show');
+      showBanner('Finding route...');
+
+      const url = 'https://router.project-osrm.org/route/v1/driving/' +
+        from[1] + ',' + from[0] + ';' + dest.lon + ',' + dest.lat +
+        '?overview=full&geometries=geojson';
+
+      const ctrl = new AbortController();
+      const timer = setTimeout(function () { ctrl.abort(); }, 12000);
+
+      fetch(url, { signal: ctrl.signal })
+        .then(function (r) { clearTimeout(timer); return r.json(); })
+        .then(function (data) {
+          if (!data.routes || !data.routes.length) { throw new Error('no route'); }
+          const route = data.routes[0];
+          const points = route.geometry.coordinates.map(function (c) { return [c[1], c[0]]; });
+
+          if (routeLayer) { map.removeLayer(routeLayer); }
+
+          // white outline first, blue line on top of it
+          const outline = L.polyline(points, {
+            color: OUTLINE_COLOR,
+            weight: OUTLINE_WIDTH,
+            opacity: 1,
+            lineJoin: 'round',
+            lineCap: 'round'
+          });
+          const line = L.polyline(points, {
+            color: ROUTE_COLOR,
+            weight: ROUTE_WIDTH,
+            opacity: 1,
+            lineJoin: 'round',
+            lineCap: 'round'
+          });
+          routeLayer = L.layerGroup([outline, line]).addTo(map);
+
+          map.fitBounds(line.getBounds(), {
+            paddingTopLeft: [40, 100],
+            paddingBottomRight: [40, 100]
+          });
+
+          routeInfo = {
+            from: from,
+            dest: { lat: dest.lat, lon: dest.lon, name: dest.name },
+            distance: route.distance,     // metres
+            duration: route.duration,     // seconds (by road)
+            points: points
+          };
+
+          routeDone = true;
+          routeBusy = false;
+          showBanner(fmt(route.distance) + ' by road');
+          startBtn.classList.add('show');            // route is ready: show Start
+        })
+        .catch(function () {
+          clearTimeout(timer);
+          routeBusy = false;
+          startBtn.classList.remove('show');
+          showBanner('Could not get the route. Check your internet.', 'Try again', function () {
+            drawRoute(lastFrom);
+          });
+        });
+    }
 
     /* ---------- Bus stop icons ---------- */
     const busSvg =
@@ -138,18 +402,20 @@
       const query = '[out:json][timeout:15];node["highway"="bus_stop"](' + box + ');out 150;';
 
       fetch('https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query))
-        .then(r => r.json())
-        .then(data => {
-          data.elements.forEach(el => {
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          data.elements.forEach(function (el) {
             if (seen.has(el.id)) { return; }
             seen.add(el.id);
             const name = (el.tags && el.tags.name) ? el.tags.name : 'Bus stop';
+            const pop = document.createElement('b');
+            pop.textContent = name;
             L.marker([el.lat, el.lon], { icon: busIcon })
-              .bindPopup('<b>' + name + '</b>')
+              .bindPopup(pop)
               .addTo(stopLayer);
           });
         })
-        .catch(() => {});
+        .catch(function () {});
     }
 
     map.on('moveend', function () {
@@ -195,8 +461,12 @@
       }
 
       if (firstFix) {
-        map.setView(myPos, 17);
         firstFix = false;
+        if (dest) {
+          drawRoute(myPos);                // start the route from your real position
+        } else {
+          map.setView(myPos, 17);
+        }
       }
     }
 
