@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Maps</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #map { height: 100%; width: 100%; }
+
+    #locBtn {
+      position: absolute;
+      right: 16px;
+      bottom: 28px;
+      z-index: 1000;
+      width: 48px;
+      height: 48px;
+      border: 0;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    #locBtn svg {
+      width: 24px;
+      height: 24px;
+      stroke: #0b5ed7;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+    }
+
+    /* Bus stop icon */
+    .bus-icon {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: #0b5ed7;
+      border: 2px solid #fff;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .bus-icon svg {
+      width: 14px;
+      height: 14px;
+      stroke: #fff;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* Your location dot */
+    .me-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #0b5ed7;
+      border: 3px solid #fff;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(11, 94, 215, 0.5); }
+      70%  { box-shadow: 0 0 0 16px rgba(11, 94, 215, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(11, 94, 215, 0); }
+    }
+
+    /* "Your location" text */
+    .me-label.leaflet-tooltip {
+      background: #0b5ed7;
+      color: #fff;
+      border: 0;
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    }
+    .me-label.leaflet-tooltip-top:before { border-top-color: #0b5ed7; }
+  </style>
+</head>
+<body>
+
+  <div id="map"></div>
+
+  <button id="locBtn" aria-label="Current location">
+    <svg viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="6.5"/>
+      <circle cx="12" cy="12" r="1.8" fill="#0b5ed7"/>
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+    </svg>
+  </button>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script>
+    // Fallback start position if location is not allowed
+    const start = [12.9634, 77.5855];
+
+    const map = L.map('map', {
+      zoomControl: false,
+      center: start,
+      zoom: 17
+    });
+
+    // Standard OpenStreetMap tiles (shows map icons like shops, hospitals, schools)
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    /* ---------- Bus stop icons ---------- */
+    const busSvg =
+      '<svg viewBox="0 0 24 24"><rect x="5" y="3.5" width="14" height="13" rx="2.5"/>' +
+      '<path d="M5 10.5h14M8 16.5V20M16 16.5V20"/></svg>';
+
+    const busIcon = L.divIcon({
+      className: '',
+      html: '<div class="bus-icon">' + busSvg + '</div>',
+      iconSize: [26, 26],
+      iconAnchor: [13, 13]
+    });
+
+    const stopLayer = L.layerGroup().addTo(map);
+    const seen = new Set();
+    let timer = null;
+
+    function loadStops() {
+      if (map.getZoom() < 15) { return; }
+      const b = map.getBounds();
+      const box = [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()].join(',');
+      const query = '[out:json][timeout:15];node["highway"="bus_stop"](' + box + ');out 150;';
+
+      fetch('https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query))
+        .then(r => r.json())
+        .then(data => {
+          data.elements.forEach(el => {
+            if (seen.has(el.id)) { return; }
+            seen.add(el.id);
+            const name = (el.tags && el.tags.name) ? el.tags.name : 'Bus stop';
+            L.marker([el.lat, el.lon], { icon: busIcon })
+              .bindPopup('<b>' + name + '</b>')
+              .addTo(stopLayer);
+          });
+        })
+        .catch(() => {});
+    }
+
+    map.on('moveend', function () {
+      clearTimeout(timer);
+      timer = setTimeout(loadStops, 600);
+    });
+    loadStops();
+
+    /* ---------- Your location ---------- */
+    let meMarker = null, accCircle = null, myPos = null, firstFix = true;
+
+    function onPosition(pos) {
+      myPos = [pos.coords.latitude, pos.coords.longitude];
+
+      if (!meMarker) {
+        accCircle = L.circle(myPos, {
+          radius: pos.coords.accuracy,
+          color: '#0b5ed7',
+          weight: 1,
+          fillOpacity: 0.1,
+          interactive: false
+        }).addTo(map);
+
+        meMarker = L.marker(myPos, {
+          icon: L.divIcon({
+            className: '',
+            html: '<div class="me-dot"></div>',
+            iconSize: [18, 18],
+            iconAnchor: [9, 9]
+          }),
+          zIndexOffset: 1000
+        }).addTo(map);
+
+        meMarker.bindTooltip('Your location', {
+          permanent: true,
+          direction: 'top',
+          offset: [0, -12],
+          className: 'me-label'
+        });
+      } else {
+        meMarker.setLatLng(myPos);
+        accCircle.setLatLng(myPos).setRadius(pos.coords.accuracy);
+      }
+
+      if (firstFix) {
+        map.setView(myPos, 17);
+        firstFix = false;
+      }
+    }
+
+    function onError() {
+      alert('Could not get your location. Please turn on location and allow permission.');
+    }
+
+    if (navigator.geolocation) {
+      navigator.geolocation.watchPosition(onPosition, function () {}, {
+        enableHighAccuracy: true,
+        maximumAge: 5000,
+        timeout: 15000
+      });
+    }
+
+    document.getElementById('locBtn').addEventListener('click', function () {
+      if (myPos) {
+        map.setView(myPos, 17);
+      } else if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(onPosition, onError, { enableHighAccuracy: true });
+      } else {
+        onError();
+      }
+    });
+  </script>
+</body>
+</html>
