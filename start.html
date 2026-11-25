@@ -178,6 +178,27 @@
       stroke-width: 1.8; stroke-linecap: round;
     }
 
+    /* Voice on / off button */
+    #voiceBtn {
+      position: absolute;
+      right: 14px;
+      bottom: 150px;
+      z-index: 1000;
+      width: 46px; height: 46px;
+      border: 0;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+    }
+    #voiceBtn svg {
+      width: 24px; height: 24px;
+      stroke: var(--accent); fill: none;
+      stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+    }
+    #voiceBtn.off svg { stroke: #9aa3b0; }
+
     /* Your arrow (turns with the phone) */
     .me-arrow { width: 46px; height: 46px; }
     .me-arrow .arr {
@@ -204,7 +225,7 @@
 </head>
 <body>
 
-<!-- Screen 1 -->
+  <!-- Screen 1 -->
   <section id="choose">
     <button id="backBtn">&#8249; Back</button>
     <h1>How do you want to go?</h1>
@@ -236,6 +257,8 @@
       </svg>
     </button>
 
+    <button id="voiceBtn" aria-label="Voice on or off"></button>
+
     <div id="bottomCard">
       <div class="left">
         <div id="rem">--</div>
@@ -244,6 +267,9 @@
       <button id="endBtn">End</button>
     </div>
   </section>
+
+  <!-- Hidden assistant page: holds all the direction logic and wording -->
+  <iframe id="assistant" src="assistant.html" style="display:none" title="assistant"></iframe>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script>
@@ -425,6 +451,7 @@
 
     function pick(key) {
       if (!result[key]) { return; }
+      unlockVoice();   // phones need a tap before speech is allowed
       // iPhone needs a tap before it allows the compass: this tap is that tap
       enableCompass().then(function () { startNav(key); });
     }
@@ -486,21 +513,92 @@
       if (arrowEl) { arrowEl.style.transform = 'rotate(' + shownHeading + 'deg)'; }
     }
 
+    /* ======== END OF PART 1: paste Part 2 right below this line ======== */
+        /* ---------- Voice assistant (logic lives in assistant.html) ---------- */
+    const VOICE_ON_ICON  = '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>';
+    const VOICE_OFF_ICON = '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M17 9l5 6M22 9l-5 6"/></svg>';
+
+    let voiceOn = true;
+    try { voiceOn = localStorage.getItem('rhk_voice') !== 'off'; } catch (e) {}
+
+    const assistantFrame = document.getElementById('assistant');
+    const voiceBtn = document.getElementById('voiceBtn');
+
+    function toAssistant(m) {
+      try { assistantFrame.contentWindow.postMessage(m, '*'); } catch (e) {}
+    }
+
+    function paintVoice() {
+      voiceBtn.innerHTML = voiceOn ? VOICE_ON_ICON : VOICE_OFF_ICON;
+      voiceBtn.classList.toggle('off', !voiceOn);
+    }
+    paintVoice();
+
+    voiceBtn.addEventListener('click', function () {
+      voiceOn = !voiceOn;
+      try { localStorage.setItem('rhk_voice', voiceOn ? 'on' : 'off'); } catch (e) {}
+      if (!voiceOn && window.speechSynthesis) { speechSynthesis.cancel(); }
+      paintVoice();
+      if (voiceOn) { speak('Voice on'); }
+    });
+
+    function speak(text) {
+      if (!voiceOn || !window.speechSynthesis || !text) { return; }
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'en-US';
+      u.rate = 1;
+      speechSynthesis.speak(u);
+    }
+
+    function unlockVoice() {
+      if (!window.speechSynthesis) { return; }
+      const u = new SpeechSynthesisUtterance(' ');
+      u.volume = 0;
+      speechSynthesis.speak(u);
+    }
+
+    // messages coming from assistant.html
+    window.addEventListener('message', function (e) {
+      if (e.source !== assistantFrame.contentWindow) { return; }
+      const m = e.data || {};
+      if (m.type === 'say') { speak(m.text); }
+      if (m.type === 'banner' && navEl.hidden === false) {
+        document.getElementById('tSub').textContent = m.text;
+      }
+    });
+
+    function assistantStart(key) {
+      toAssistant({ type: 'route', points: routePts, mode: key, destName: dest.name });
+    }
+    function assistantPos(pos) {
+      toAssistant({ type: 'pos', pos: pos });
+    }
+
     /* ---------- Screen 2: navigation ---------- */
     let map = null, meMarker = null, myPos = null, follow = true, finished = false;
     let routePts = [], cum = [], total = 0, current = null;
+    let watchId = null, lastIdx = 0;
 
     function startNav(key) {
       current = key;
+      finished = false;
+      follow = true;
+      lastIdx = 0;
       const m = MODES[key], r = result[key];
 
       chooseEl.hidden = true;
       navEl.hidden = false;
+      document.getElementById('recenter').hidden = true;
+      document.getElementById('bottomCard').classList.remove('arrived');
 
       routePts = r.points;
       cum = [0];
       for (let i = 1; i < routePts.length; i++) { cum.push(cum[i - 1] + metres(routePts[i - 1], routePts[i])); }
       total = cum[cum.length - 1] || r.distance;
+
+      // tell the assistant about the route
+      assistantStart(key);
 
       document.getElementById('tIcon').innerHTML = ICONS[key];
       document.getElementById('tTitle').textContent = m.verb + ' to ' + dest.name;     // safe
@@ -547,83 +645,102 @@
         zIndexOffset: 1000
       }).addTo(map);
       arrowEl = meMarker.getElement().querySelector('.arr');
-      arrowEl.style.transform = 'rotate(' + shownHeading + 'deg)';
+      if (arrowEl) { arrowEl.style.transform = 'rotate(' + shownHeading + 'deg)'; }
 
       myPos = from;
-      showProgress(from);
 
-      // map follows you until you drag it
+      // if the user drags the map, stop following and show the recenter button
       map.on('dragstart', function () {
         follow = false;
         document.getElementById('recenter').hidden = false;
       });
-      document.getElementById('recenter').addEventListener('click', function () {
-        follow = true;
-        this.hidden = true;
-        if (myPos) { map.setView(myPos, Math.max(map.getZoom(), 17)); }
-      });
-      document.getElementById('endBtn').addEventListener('click', goHome);
 
-      if (navigator.geolocation) {
-        navigator.geolocation.watchPosition(onPosition, function () {
-          document.getElementById('tSub').textContent = 'Turn on location to see where you are';
-        }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 });
-      }
-
-      // no compass after a few seconds: say the arrow will follow your movement
-      setTimeout(function () {
-        if (!compassOK) {
-          document.getElementById('tSub').textContent = 'No compass found, the arrow follows your direction of movement';
-        }
-      }, 4000);
+      updateInfo(from);
+      startGPS();
     }
 
-    function onPosition(pos) {
-      myPos = [pos.coords.latitude, pos.coords.longitude];
-      meMarker.setLatLng(myPos);
+    /* ---------- GPS ---------- */
+    function startGPS() {
+      if (!navigator.geolocation) {
+        document.getElementById('tSub').textContent = 'GPS is not available on this device';
+        return;
+      }
+      if (watchId !== null) { navigator.geolocation.clearWatch(watchId); }
+      watchId = navigator.geolocation.watchPosition(onGPS, function () {
+        document.getElementById('tSub').textContent = 'Cannot get your location. Check GPS permission.';
+      }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 });
+    }
 
-      // no compass: use the direction you are moving in
-      if (!compassOK && pos.coords.heading != null && !isNaN(pos.coords.heading) && (pos.coords.speed || 0) > 0.8) {
+    function onGPS(pos) {
+      if (finished || !map) { return; }
+      const p = [pos.coords.latitude, pos.coords.longitude];
+      myPos = p;
+      meMarker.setLatLng(p);
+
+      // if there is no compass, turn the arrow with the moving direction
+      if (!compassOK && typeof pos.coords.heading === 'number' && !isNaN(pos.coords.heading)) {
         setHeading(pos.coords.heading);
       }
 
-      if (follow) { map.setView(myPos, Math.max(map.getZoom(), 17), { animate: true }); }
-      showProgress(myPos);
+      if (follow) { map.setView(p, map.getZoom(), { animate: true }); }
+
+      updateInfo(p);
+      assistantPos(p);          // the assistant decides what to say
     }
 
-    // distance left along the route, time left, and "arrived"
-    function showProgress(p) {
-      let best = 0, bd = Infinity;
-      for (let i = 0; i < routePts.length; i++) {
+    // remaining distance and time
+    function updateInfo(p) {
+      // nearest point on the route (looking mostly forward)
+      let best = lastIdx, bd = Infinity;
+      for (let i = Math.max(0, lastIdx - 3); i < routePts.length; i++) {
         const d = metres(p, routePts[i]);
         if (d < bd) { bd = d; best = i; }
       }
-      const left = Math.max(0, total - cum[best]) + bd;
-      const toDest = metres(p, [dest.lat, dest.lon]);
-      const card = document.getElementById('bottomCard');
+      lastIdx = best;
 
-      if (toDest <= ARRIVE_AT || finished) {
-        finished = true;
-        card.classList.add('arrived');
-        document.getElementById('rem').textContent = 'You have arrived';
-        document.getElementById('eta').textContent = dest.name;
+      const remaining = Math.max(0, (total - cum[best]) + (bd < 60 ? bd : 0));
+      const toDest = metres(p, [dest.lat, dest.lon]);
+
+      if (toDest <= ARRIVE_AT) {
+        arrive();
         return;
       }
 
-      document.getElementById('rem').textContent = fmtDist(left);
-      document.getElementById('eta').textContent = fmtTime(secondsFor(left, current)) + ' left';
+      document.getElementById('rem').textContent = fmtDist(remaining);
+      const secs = secondsFor(remaining, current);
+      const arriveTime = new Date(Date.now() + secs * 1000);
+      let hh = arriveTime.getHours(), mm = arriveTime.getMinutes();
+      document.getElementById('eta').textContent =
+        fmtTime(secs) + '  \u00b7  Arrive ' + (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm;
     }
 
-    // End: back to the Home page
-    function goHome() {
-      try {
-        if (window.parent && window.parent !== window && typeof window.parent.go === 'function') {
-          window.parent.go('home.html', window.parent.document.getElementById('homeBtn'));
-          return;
-        }
-      } catch (e) {}
-      location.href = 'home.html';
+    function arrive() {
+      finished = true;
+      document.getElementById('rem').textContent = 'You have arrived';
+      document.getElementById('eta').textContent = dest.name;
+      document.getElementById('bottomCard').classList.add('arrived');
+      document.getElementById('endBtn').textContent = 'Done';
+      if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
     }
+
+    /* ---------- Buttons ---------- */
+    document.getElementById('recenter').addEventListener('click', function () {
+      follow = true;
+      this.hidden = true;
+      if (map && myPos) { map.setView(myPos, Math.max(map.getZoom(), 17), { animate: true }); }
+    });
+
+    document.getElementById('endBtn').addEventListener('click', function () {
+      if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+      toAssistant({ type: 'stop' });
+      if (window.speechSynthesis) { speechSynthesis.cancel(); }
+      if (map) { map.remove(); map = null; }
+      meMarker = null; arrowEl = null;
+      finished = false;
+      document.getElementById('endBtn').textContent = 'End';
+      navEl.hidden = true;
+      chooseEl.hidden = false;
+    });
   </script>
 </body>
 </html>
