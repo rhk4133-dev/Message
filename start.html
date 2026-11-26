@@ -131,24 +131,6 @@
     }
     #tSub { font-size: 12px; color: #556072; margin-top: 2px; }
 
-    /* voice on / off */
-    #voiceBtn {
-      width: 40px; height: 40px;
-      border: 0;
-      border-radius: 50%;
-      background: #eaf1fd;
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
-      cursor: pointer;
-    }
-    #voiceBtn svg {
-      width: 22px; height: 22px;
-      stroke: var(--accent); fill: none;
-      stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round;
-    }
-    #voiceBtn.off { background: #eef1f5; }
-    #voiceBtn.off svg { stroke: #7a8494; }
-
     /* next turn */
     #turnCard {
       position: absolute;
@@ -251,7 +233,8 @@
   </style>
 </head>
 <body>
-<!-- Screen 1 -->
+
+  <!-- Screen 1 -->
   <section id="choose">
     <button id="backBtn">&#8249; Back</button>
     <h1>How do you want to go?</h1>
@@ -273,7 +256,6 @@
         <div id="tTitle"></div>
         <div id="tSub"></div>
       </div>
-      <button id="voiceBtn" aria-label="Voice guidance on or off"></button>
     </div>
 
     <div id="turnCard">
@@ -308,11 +290,11 @@
     const BIKE_MAX = 6000;     // up to this many metres: suggest Bike, longer: Car
     const ARRIVE_AT = 30;      // metres from the stop = "arrived"
 
-    // Voice: "far" = first warning, "near" = turn now, "pass" = turn done
-    const GUIDE = {
-      walk: { far: 60,  near: 20, pass: 12 },
-      bike: { far: 120, near: 30, pass: 18 },
-      car:  { far: 250, near: 50, pass: 25 }
+    // Turn card: "near" = you reached the turn, "pass" = the turn is done
+    const TURN = {
+      walk: { near: 20, pass: 12 },
+      bike: { near: 30, pass: 18 },
+      car:  { near: 50, pass: 25 }
     };
 
     const ROUTE_COLOR   = '#1a73e8';
@@ -325,9 +307,6 @@
       bike: '<svg viewBox="0 0 24 24"><circle cx="6" cy="16" r="3.5"/><circle cx="18" cy="16" r="3.5"/><path d="M6 16l3.5-7.5H14M9.5 8.5 12 16M12 16l4.5-7.5M14 8.5l4 7.5"/></svg>',
       car:  '<svg viewBox="0 0 24 24"><path d="M3.5 14.5V11l2-5h13l2 5v3.5"/><path d="M3.5 11h17"/><circle cx="7.5" cy="16" r="1.6"/><circle cx="16.5" cy="16" r="1.6"/></svg>'
     };
-
-    const VOICE_ON_SVG  = '<svg viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4Z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>';
-    const VOICE_OFF_SVG = '<svg viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4Z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>';
 
     // speed (km/h) is only used to estimate the time
     const MODES = {
@@ -367,7 +346,7 @@
 
     if (!from || !dest || isNaN(dest.lat) || isNaN(from[0])) {
       document.getElementById('destLine').style.display = 'none';
-      modesEl.innerHTML = '<p class="msg">No route found. Go back, tap a stop on the Home page, then press Start on the map.</p>';
+      modesEl.innerHTML = '<p class="msg">No route found. Go back to the map, search a place or tap a stop on the Home page, then press Start.</p>';
     } else {
       initChoose();
     }
@@ -387,14 +366,6 @@
       if (min < 60) { return min + ' min'; }
       const h = Math.floor(min / 60), r = min % 60;
       return h + ' h' + (r ? ' ' + r + ' min' : '');
-    }
-    // distance in words, for the voice
-    function sayDist(m) {
-      if (m < 1000) {
-        const r = m < 100 ? Math.round(m / 10) * 10 : Math.round(m / 50) * 50;
-        return Math.max(10, r) + ' metres';
-      }
-      return (m / 1000).toFixed(1) + ' kilometres';
     }
     function lowerFirst(s) { return s ? s.charAt(0).toLowerCase() + s.slice(1) : s; }
 
@@ -446,19 +417,18 @@
         (rt.legs || []).forEach(function (l) { (l.steps || []).forEach(function (s) { raw.push(s); }); });
         const out = raw.map(function (s) {
           const m = s.maneuver || {};
-          const text = stepText(s);
           return {
             type: m.type,
             mod: m.modifier || '',
             loc: m.location ? [m.location[1], m.location[0]] : null,
-            text: text,
-            say: lowerFirst(text),
+            text: stepText(s),
             dist: s.distance || 0
           };
         }).filter(function (s) { return s.loc; });
         return out.length >= 2 ? out : null;
       } catch (e) { return null; }
     }
+
     // arrow that points the way of the turn
     const ROT = { 'straight': 0, 'slight right': 45, 'right': 90, 'sharp right': 135,
                   'uturn': 180, 'sharp left': -135, 'left': -90, 'slight left': -45 };
@@ -470,65 +440,13 @@
       return '<svg viewBox="0 0 24 24" style="transform:rotate(' + r + 'deg)"><path d="M12 20V5M12 5 6.5 10.5M12 5l5.5 5.5"/></svg>';
     }
 
-    /* ---------- Voice ---------- */
-    const synth = window.speechSynthesis || null;
-    let voice = null;
-    let voiceOn = true;
-    try { voiceOn = localStorage.getItem('rhk_voice') !== 'off'; } catch (e) {}
-
-    function pickVoice() {
-      if (!synth) { return; }
-      const vs = synth.getVoices() || [];
-      voice = vs.find(function (v) { return /en[-_]IN/i.test(v.lang); }) ||
-              vs.find(function (v) { return /^en/i.test(v.lang); }) || null;
-    }
-    if (synth) { pickVoice(); synth.onvoiceschanged = pickVoice; }
-
-    function speak(text) {
-      if (!voiceOn || !synth || !text) { return; }
-      try {
-        synth.cancel();                               // never read old instructions
-        const u = new SpeechSynthesisUtterance(text);
-        u.lang = voice ? voice.lang : 'en-IN';
-        if (voice) { u.voice = voice; }
-        u.rate = 1;
-        u.volume = 1;
-        synth.speak(u);
-      } catch (e) {}
-    }
-
-    // the phone only allows sound after a tap: this runs inside the tap
-    function unlockSpeech() {
-      if (!synth) { return; }
-      try {
-        const u = new SpeechSynthesisUtterance(' ');
-        u.volume = 0;
-        synth.speak(u);
-      } catch (e) {}
-    }
-
-    function drawVoiceBtn() {
-      const b = document.getElementById('voiceBtn');
-      b.innerHTML = voiceOn ? VOICE_ON_SVG : VOICE_OFF_SVG;
-      b.classList.toggle('off', !voiceOn);
-      b.title = voiceOn ? 'Voice on' : 'Voice off';
-    }
-
-    document.getElementById('voiceBtn').addEventListener('click', function () {
-      voiceOn = !voiceOn;
-      try { localStorage.setItem('rhk_voice', voiceOn ? 'on' : 'off'); } catch (e) {}
-      drawVoiceBtn();
-      if (!voiceOn) { if (synth) { synth.cancel(); } }
-      else { speak('Voice guidance on'); }
-    });
-
     /* ---------- Screen 1 ---------- */
     const result = {};          // walk / bike / car -> { distance, points, steps, estimated }
 
     function initChoose() {
       document.getElementById('destName').textContent = dest.name;      // textContent: safe
       document.getElementById('note').textContent =
-        'Times are estimates. Suggested is picked from the route distance. Voice guidance can be switched on or off on the next screen.';
+        'Times are estimates. Suggested is picked from the route distance.';
 
       modesEl.innerHTML = '';
       Object.keys(MODES).forEach(function (key) {
@@ -641,8 +559,7 @@
 
     function pick(key) {
       if (!result[key]) { return; }
-      unlockSpeech();                                  // allows the voice (needs a tap)
-      // iPhone also needs a tap before it allows the compass
+      // iPhone needs a tap before it allows the compass: this tap is that tap
       enableCompass().then(function () { startNav(key); });
     }
 
@@ -659,6 +576,7 @@
       listenCompass();
       return Promise.resolve();
     }
+
     function listenCompass() {
       if (compassOn) { return; }
       compassOn = true;
@@ -707,10 +625,9 @@
     let routePts = [], cum = [], total = 0, current = null;
 
     // turn-by-turn state
-    let steps = null, stepIdx = 0, farDone = false, nearDone = false, minD = Infinity;
-    let warned300 = false, warned100 = false;
+    let steps = null, stepIdx = 0, nearDone = false, minD = Infinity;
 
-    function resetStep() { farDone = false; nearDone = false; minD = Infinity; }
+    function resetStep() { nearDone = false; minD = Infinity; }
 
     function startNav(key) {
       current = key;
@@ -718,7 +635,6 @@
 
       chooseEl.hidden = true;
       navEl.hidden = false;
-      drawVoiceBtn();
 
       routePts = r.points;
       cum = [0];
@@ -779,15 +695,6 @@
       myPos = from;
       showProgress(from);
 
-      // first words
-      if (steps) {
-        const first = steps[0];
-        speak(m.verb + ' to ' + dest.name + '. ' + first.text +
-              (first.dist > 0 ? ' for ' + sayDist(first.dist) : '') + '.');
-      } else {
-        speak(m.verb + ' to ' + dest.name + '. Follow the blue line on the map.');
-      }
-
       // map follows you until you drag it
       map.on('dragstart', function () {
         follow = false;
@@ -827,7 +734,7 @@
       showProgress(myPos);
     }
 
-    // distance left, time left, turn directions, voice and "arrived"
+    // distance left, time left, turn card and "arrived"
     function showProgress(p) {
       let best = 0, bd = Infinity;
       for (let i = 0; i < routePts.length; i++) {
@@ -839,7 +746,6 @@
       const card = document.getElementById('bottomCard');
 
       if (toDest <= ARRIVE_AT || finished) {
-        if (!finished) { speak('You have arrived at ' + dest.name + '.'); }
         finished = true;
         card.classList.add('arrived');
         document.getElementById('rem').textContent = 'You have arrived';
@@ -853,12 +759,12 @@
       document.getElementById('rem').textContent = fmtDist(left);
       document.getElementById('eta').textContent = fmtTime(secondsFor(left, current)) + ' left';
 
-      if (steps) { guide(p); } else { guideNoSteps(toDest); }
+      if (steps) { showTurn(p); } else { noSteps(); }
     }
 
-    // Turn-by-turn: warn early, say it again at the turn, then move on
-    function guide(p) {
-      const G = GUIDE[current];
+    // Turn card: show the next turn, move on to the next one after you pass it
+    function showTurn(p) {
+      const G = TURN[current];
       let s = steps[stepIdx];
       let d = metres(p, s.loc);
 
@@ -871,18 +777,9 @@
       }
 
       if (d < minD) { minD = d; }
+      if (d <= G.near) { nearDone = true; }
 
-      if (!farDone && d <= G.far && d > G.near) {
-        speak('In ' + sayDist(d) + ', ' + s.say + '.');
-        farDone = true;
-      }
-      if (!nearDone && d <= G.near) {
-        if (s.type !== 'arrive') { speak(s.text + '.'); }
-        nearDone = true;
-        farDone = true;
-      }
-
-      // turn done (reached it, or moving away from it): next turn
+      // turn done (reached it, then passed it): next turn
       if (nearDone && s.type !== 'arrive' && stepIdx < steps.length - 1 && (d <= G.pass || d > minD + 20)) {
         stepIdx++;
         resetStep();
@@ -891,32 +788,20 @@
         minD = d;
       }
 
-      // the blue turn card
       document.getElementById('turnIcon').innerHTML = turnIcon(s);
       document.getElementById('turnText').textContent = s.text;
       document.getElementById('turnDist').textContent = (s.type === 'arrive' ? '' : 'in ') + fmtDist(d);
     }
 
-    // No turn data for this route: only show the route and warn near the stop
-    function guideNoSteps(toDest) {
+    // No turn data for this route: only show the route
+    function noSteps() {
       document.getElementById('turnIcon').innerHTML = turnIcon(null);
       document.getElementById('turnText').textContent = 'Follow the blue line';
       document.getElementById('turnDist').textContent = 'Turn directions are not available for this route';
-
-      if (!warned300 && toDest <= 300 && toDest > 100) {
-        speak('Your destination is in ' + sayDist(toDest) + '.');
-        warned300 = true;
-      }
-      if (!warned100 && toDest <= 100) {
-        speak('Your destination is very close, in ' + sayDist(toDest) + '.');
-        warned100 = true;
-        warned300 = true;
-      }
     }
 
-    // End: stop talking, back to the Home page
+    // End: back to the Home page
     function goHome() {
-      if (synth) { try { synth.cancel(); } catch (e) {} }
       try {
         if (window.parent && window.parent !== window && typeof window.parent.go === 'function') {
           window.parent.go('home.html', window.parent.document.getElementById('homeBtn'));
