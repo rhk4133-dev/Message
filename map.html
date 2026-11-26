@@ -10,6 +10,98 @@
     html, body, #map { height: 100%; width: 100%; }
     body { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
 
+    /* ---------- Search bar ---------- */
+    #searchBox {
+      position: absolute;
+      top: 12px; left: 12px; right: 12px;
+      z-index: 1100;
+    }
+    #sForm {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 48px;
+      padding: 0 8px 0 14px;
+      border-radius: 24px;
+      background: #fff;
+      box-shadow: 0 1px 8px rgba(0, 0, 0, 0.28);
+    }
+    #sForm .mag {
+      width: 20px; height: 20px; flex-shrink: 0;
+      stroke: #7a8494; fill: none;
+      stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    }
+    #sInput {
+      flex: 1;
+      min-width: 0;
+      height: 100%;
+      border: 0;
+      outline: 0;
+      background: none;
+      font: inherit;
+      font-size: 16px;
+      color: #1c2430;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    #sInput::-webkit-search-cancel-button { display: none; }
+    #sClear, #sGo {
+      border: 0;
+      border-radius: 50%;
+      width: 34px; height: 34px;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+    }
+    #sClear { background: none; color: #7a8494; font-size: 16px; }
+    #sGo { background: #1a73e8; }
+    #sGo svg {
+      width: 18px; height: 18px;
+      stroke: #fff; fill: none;
+      stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
+    }
+
+    #sResults {
+      margin-top: 6px;
+      max-height: 52vh;
+      overflow-y: auto;
+      border-radius: 14px;
+      background: #fff;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+    }
+    #sResults[hidden] { display: none; }
+    .res {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 12px 14px;
+      border: 0;
+      border-bottom: 1px solid #eef1f5;
+      background: #fff;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+      -webkit-tap-highlight-color: rgba(11, 94, 215, 0.12);
+    }
+    .res:last-child { border-bottom: 0; }
+    .res svg {
+      width: 20px; height: 20px; flex-shrink: 0;
+      stroke: #d93025; fill: none;
+      stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    }
+    .res .rt {
+      font-size: 15px; font-weight: 600; color: #1c2430;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .res .rs {
+      font-size: 12px; color: #6b7686; margin-top: 2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .res .rtxt { flex: 1; min-width: 0; }
+    .smsg { padding: 14px; font-size: 14px; color: #6b7686; }
+
+    /* ---------- Buttons on the map ---------- */
     #locBtn {
       position: absolute;
       right: 16px;
@@ -70,10 +162,10 @@
       stroke-linejoin: round;
     }
 
-    /* Route info card at the top */
+    /* Route info card (under the search bar) */
     #banner {
       position: absolute;
-      top: 12px; left: 12px; right: 12px;
+      top: 68px; left: 12px; right: 12px;
       z-index: 1000;
       display: none;
       align-items: center;
@@ -123,7 +215,6 @@
       stroke-linecap: round;
       stroke-linejoin: round;
     }
-
     /* Destination pin */
     .dest-pin svg { width: 34px; height: 34px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4)); }
 
@@ -173,6 +264,21 @@
 
   <div id="map"></div>
 
+  <!-- Search bar -->
+  <div id="searchBox">
+    <form id="sForm" autocomplete="off">
+      <svg class="mag" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
+      <input id="sInput" type="search" placeholder="Search destination" enterkeyhint="search"
+             autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false">
+      <button type="button" id="sClear" aria-label="Clear" hidden>&#10005;</button>
+      <button type="submit" id="sGo" aria-label="Search">
+        <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </button>
+    </form>
+    <div id="sResults" hidden></div>
+  </div>
+
+  <!-- Route info card -->
   <div id="banner">
     <svg class="pin" viewBox="0 0 24 24" fill="none" stroke="#d93025" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z"/>
@@ -221,18 +327,18 @@
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    /* ---------- Destination from the Home page (if any) ---------- */
+    /* ---------- State ---------- */
+    let dest = null;                     // where the user wants to go
+    let routeLayer = null, destMarker = null;
+    let routeBusy = false, routeDone = false;
+    let routeToken = 0;                  // makes sure an old route never replaces a new one
+    let routeInfo = null;                // sent to start.html when Start is tapped
+    let lastFrom = null;
+    let myPos = null;                    // your live position
+
     const q = new URLSearchParams(location.search);
-    const dest = q.get('dlat') ? {
-      lat: parseFloat(q.get('dlat')),
-      lon: parseFloat(q.get('dlon')),
-      name: q.get('name') || 'Destination'
-    } : null;
     const passedStart = (q.get('slat') && q.get('slon'))
       ? [parseFloat(q.get('slat')), parseFloat(q.get('slon'))] : null;
-
-    let routeLayer = null, destMarker = null, routeBusy = false, routeDone = false, lastFrom = null;
-    let routeInfo = null;     // route details, sent to start.html when Start is tapped
 
     const banner = document.getElementById('banner');
     const bName = document.getElementById('bName');
@@ -240,7 +346,12 @@
     const bAction = document.getElementById('bAction');
     const startBtn = document.getElementById('startBtn');
 
+    function fmt(m) {
+      return m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(1) + ' km';
+    }
+
     function showBanner(sub, actionText, actionFn) {
+      if (!dest) { return; }
       bName.textContent = dest.name;       // textContent: safe for any name
       bSub.textContent = sub;
       if (actionText) {
@@ -253,38 +364,23 @@
       banner.classList.add('show');
     }
 
-    // X button: clear the route, the pin and the Start button
-    document.getElementById('bClose').addEventListener('click', function () {
+    /* ---------- Set / clear the destination ---------- */
+    function clearRoute() {
+      routeToken++;                        // ignore any route still loading
       if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
       if (destMarker) { map.removeLayer(destMarker); destMarker = null; }
-      banner.classList.remove('show');
       startBtn.classList.remove('show');
+      banner.classList.remove('show');
       routeInfo = null;
-      routeDone = true;
-      if (myPos) { map.setView(myPos, 17); }
-    });
-
-    // Start button: go to start.html with the route details
-    startBtn.addEventListener('click', function () {
-      if (!routeInfo) { return; }
-      try { sessionStorage.setItem('rhk_route', JSON.stringify(routeInfo)); } catch (e) {}
-
-      const p = new URLSearchParams();
-      p.set('dlat', routeInfo.dest.lat);
-      p.set('dlon', routeInfo.dest.lon);
-      p.set('name', routeInfo.dest.name);
-      p.set('slat', routeInfo.from[0]);
-      p.set('slon', routeInfo.from[1]);
-      p.set('dist', Math.round(routeInfo.distance));
-      location.href = 'start.html?' + p.toString();
-    });
-
-    function fmt(m) {
-      return m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(1) + ' km';
+      routeBusy = false;
+      routeDone = false;
     }
 
-    if (dest && !isNaN(dest.lat) && !isNaN(dest.lon)) {
-      destMarker = L.marker([dest.lat, dest.lon], {
+    function setDestination(d, from) {
+      clearRoute();
+      dest = d;
+
+      destMarker = L.marker([d.lat, d.lon], {
         icon: L.divIcon({
           className: 'dest-pin',
           html: '<svg viewBox="0 0 24 24" fill="#d93025" stroke="#fff" stroke-width="1.5" stroke-linejoin="round">' +
@@ -304,22 +400,51 @@
         className: 'dest-label'
       });
 
-      map.setView([dest.lat, dest.lon], 15);
-      showBanner('Finding route...');
-      if (passedStart) { drawRoute(passedStart); }
-      // otherwise the route starts as soon as your location is found (below)
+      map.setView([d.lat, d.lon], 15);
+
+      const startFrom = myPos || from || null;
+      if (startFrom) {
+        showBanner('Finding route...');
+        drawRoute(startFrom);
+      } else {
+        showBanner('Waiting for your location...');   // route starts when your location is found
+      }
     }
+
+    // X on the top card: clear the route
+    document.getElementById('bClose').addEventListener('click', function () {
+      clearRoute();
+      dest = null;
+      if (myPos) { map.setView(myPos, 17); }
+    });
+
+    // Start button: go to start.html with the route details
+    startBtn.addEventListener('click', function () {
+      if (!routeInfo) { return; }
+      try { sessionStorage.setItem('rhk_route', JSON.stringify(routeInfo)); } catch (e) {}
+
+      const p = new URLSearchParams();
+      p.set('dlat', routeInfo.dest.lat);
+      p.set('dlon', routeInfo.dest.lon);
+      p.set('name', routeInfo.dest.name);
+      p.set('slat', routeInfo.from[0]);
+      p.set('slon', routeInfo.from[1]);
+      p.set('dist', Math.round(routeInfo.distance));
+      location.href = 'start.html?' + p.toString();
+    });
 
     /* ---------- Route along the real roads (OSRM, free, no key) ---------- */
     function drawRoute(from) {
       if (!dest || routeBusy || routeDone) { return; }
       routeBusy = true;
       lastFrom = from;
+      const token = routeToken;
+      const target = dest;
       startBtn.classList.remove('show');
       showBanner('Finding route...');
 
       const url = 'https://router.project-osrm.org/route/v1/driving/' +
-        from[1] + ',' + from[0] + ';' + dest.lon + ',' + dest.lat +
+        from[1] + ',' + from[0] + ';' + target.lon + ',' + target.lat +
         '?overview=full&geometries=geojson';
 
       const ctrl = new AbortController();
@@ -328,6 +453,7 @@
       fetch(url, { signal: ctrl.signal })
         .then(function (r) { clearTimeout(timer); return r.json(); })
         .then(function (data) {
+          if (token !== routeToken) { return; }         // user chose another place meanwhile
           if (!data.routes || !data.routes.length) { throw new Error('no route'); }
           const route = data.routes[0];
           const points = route.geometry.coordinates.map(function (c) { return [c[1], c[0]]; });
@@ -336,29 +462,21 @@
 
           // white outline first, blue line on top of it
           const outline = L.polyline(points, {
-            color: OUTLINE_COLOR,
-            weight: OUTLINE_WIDTH,
-            opacity: 1,
-            lineJoin: 'round',
-            lineCap: 'round'
+            color: OUTLINE_COLOR, weight: OUTLINE_WIDTH, opacity: 1, lineJoin: 'round', lineCap: 'round'
           });
           const line = L.polyline(points, {
-            color: ROUTE_COLOR,
-            weight: ROUTE_WIDTH,
-            opacity: 1,
-            lineJoin: 'round',
-            lineCap: 'round'
+            color: ROUTE_COLOR, weight: ROUTE_WIDTH, opacity: 1, lineJoin: 'round', lineCap: 'round'
           });
           routeLayer = L.layerGroup([outline, line]).addTo(map);
 
           map.fitBounds(line.getBounds(), {
-            paddingTopLeft: [40, 100],
+            paddingTopLeft: [40, 130],
             paddingBottomRight: [40, 100]
           });
 
           routeInfo = {
             from: from,
-            dest: { lat: dest.lat, lon: dest.lon, name: dest.name },
+            dest: { lat: target.lat, lon: target.lon, name: target.name },
             distance: route.distance,     // metres
             duration: route.duration,     // seconds (by road)
             points: points
@@ -371,12 +489,114 @@
         })
         .catch(function () {
           clearTimeout(timer);
+          if (token !== routeToken) { return; }
           routeBusy = false;
           startBtn.classList.remove('show');
           showBanner('Could not get the route. Check your internet.', 'Try again', function () {
             drawRoute(lastFrom);
           });
         });
+    }
+
+    /* ---------- Search (OpenStreetMap Nominatim, free, no key) ---------- */
+    const sForm = document.getElementById('sForm');
+    const sInput = document.getElementById('sInput');
+    const sClear = document.getElementById('sClear');
+    const sResults = document.getElementById('sResults');
+    let searchToken = 0;
+
+    const PIN_SVG = '<svg viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></svg>';
+
+    function hideResults() { sResults.hidden = true; }
+
+    function message(text) {
+      sResults.innerHTML = '';
+      const d = document.createElement('div');
+      d.className = 'smsg';
+      d.textContent = text;
+      sResults.appendChild(d);
+      sResults.hidden = false;
+    }
+
+    sInput.addEventListener('input', function () {
+      sClear.hidden = !sInput.value;
+    });
+    sClear.addEventListener('click', function () {
+      sInput.value = '';
+      sClear.hidden = true;
+      hideResults();
+      sInput.focus();
+    });
+    sInput.addEventListener('focus', function () {
+      if (sResults.children.length) { sResults.hidden = false; }
+    });
+    map.on('click', function () { hideResults(); sInput.blur(); });
+    map.on('dragstart', hideResults);
+
+    sForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const text = sInput.value.trim();
+      if (text.length < 2) { message('Type at least 2 letters.'); return; }
+      sInput.blur();
+      runSearch(text);
+    });
+
+    function runSearch(text) {
+      const token = ++searchToken;
+      message('Searching...');
+
+      // show places near you first
+      const c = myPos || [map.getCenter().lat, map.getCenter().lng];
+      const box = [c[1] - 0.6, c[0] + 0.6, c[1] + 0.6, c[0] - 0.6].join(',');   // left,top,right,bottom
+
+      const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=7&accept-language=en' +
+        '&viewbox=' + box + '&bounded=0&q=' + encodeURIComponent(text);
+
+      const ctrl = new AbortController();
+      const timer = setTimeout(function () { ctrl.abort(); }, 10000);
+
+      fetch(url, { signal: ctrl.signal })
+        .then(function (r) { clearTimeout(timer); return r.json(); })
+        .then(function (list) {
+          if (token !== searchToken) { return; }
+          if (!list || !list.length) { message('No place found. Try another name.'); return; }
+          showResults(list);
+        })
+        .catch(function () {
+          clearTimeout(timer);
+          if (token !== searchToken) { return; }
+          message('Could not search. Check your internet and try again.');
+        });
+    }
+
+    function showResults(list) {
+      sResults.innerHTML = '';
+      list.forEach(function (r) {
+        const parts = String(r.display_name || '').split(',');
+        const title = (r.name && r.name.trim()) || parts[0].trim() || 'Place';
+        const rest = parts.slice(1).join(',').trim();
+
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'res';
+        b.innerHTML = PIN_SVG + '<div class="rtxt"><div class="rt"></div><div class="rs"></div></div>';
+        b.querySelector('.rt').textContent = title;        // textContent: safe
+        b.querySelector('.rs').textContent = rest;
+        b.addEventListener('click', function () {
+          hideResults();
+          sInput.value = title;
+          sClear.hidden = false;
+          setDestination({ lat: parseFloat(r.lat), lon: parseFloat(r.lon), name: title });
+        });
+        sResults.appendChild(b);
+      });
+      sResults.hidden = false;
+    }
+
+    /* ---------- Destination sent from the Home page (if any) ---------- */
+    if (q.get('dlat')) {
+      const d = { lat: parseFloat(q.get('dlat')), lon: parseFloat(q.get('dlon')), name: q.get('name') || 'Destination' };
+      if (!isNaN(d.lat) && !isNaN(d.lon)) { setDestination(d, passedStart); }
     }
 
     /* ---------- Bus stop icons ---------- */
@@ -425,7 +645,7 @@
     loadStops();
 
     /* ---------- Your location ---------- */
-    let meMarker = null, accCircle = null, myPos = null, firstFix = true;
+    let meMarker = null, accCircle = null, firstFix = true;
 
     function onPosition(pos) {
       myPos = [pos.coords.latitude, pos.coords.longitude];
@@ -463,7 +683,7 @@
       if (firstFix) {
         firstFix = false;
         if (dest) {
-          drawRoute(myPos);                // start the route from your real position
+          drawRoute(myPos);                // a place was chosen before your location was found
         } else {
           map.setView(myPos, 17);
         }
@@ -475,7 +695,11 @@
     }
 
     if (navigator.geolocation) {
-      navigator.geolocation.watchPosition(onPosition, function () {}, {
+      navigator.geolocation.watchPosition(onPosition, function () {
+        if (dest && !routeDone && !routeBusy) {
+          showBanner('Turn on location to get the route');
+        }
+      }, {
         enableHighAccuracy: true,
         maximumAge: 5000,
         timeout: 15000
